@@ -293,14 +293,13 @@ router.get(
 );
 
 // ─── POST /api/barbers/me/slots/seed-week ─────────────────────────────────────
-// Normalises the next 7 days to exactly 13 standard hourly slots (10:00–23:00).
+// Fills empty days in the next 7 days with 13 standard hourly slots (10:00–23:00).
 //
 // Rules:
-//  1. Never touch slots that have ANY appointment linked (any status).
-//  2. Delete only slots with no appointment reference (removes duplicates / stale data).
-//  3. After cleanup, insert only the standard slots that don't already exist
-//     (same barber + date + startTime) — prevents duplicates.
-//  4. Logs deleted and inserted counts per date.
+//  - If a day already has ANY slots → leave it completely untouched.
+//  - If a day has NO slots → insert all 13 standard slots.
+//
+// This means intentionally deleted slots are never re-created.
 router.post(
   "/me/slots/seed-week",
   authenticate,
@@ -328,92 +327,46 @@ router.post(
     // Standard schedule: 10:00–11:00 … 22:00–23:00 (13 slots)
     const DEFAULT_HOURS = Array.from({ length: 13 }, (_, i) => i + 10);
 
-    let totalDeleted = 0;
     let totalInserted = 0;
-    const summary: Record<string, { deleted: number; inserted: number }> = {};
-
-    // Standard (start_time, end_time) pairs: (10:00,11:00) … (22:00,23:00)
-    const STANDARD_PAIRS = DEFAULT_HOURS.map((h) => ({
-      start: `${String(h).padStart(2, "0")}:00`,
-      end:   `${String(h + 1).padStart(2, "0")}:00`,
-    }));
-    // Build VALUES clause: (start, end), (start, end), …
-    const STANDARD_PAIRS_SQL = sql.join(
-      STANDARD_PAIRS.map((p) => sql`(${p.start}, ${p.end})`),
-      sql`, `,
-    );
+    const summary: Record<string, { inserted: number; skipped: boolean }> = {};
 
     for (const date of dates) {
-      // ── Step 0: purge non-standard slots (09:xx, xx:30, wrong duration, etc.)
-      // A slot is non-standard if its (start_time, end_time) pair is NOT one of
-      // the 13 canonical hourly pairs.  We cascade-delete appointments first.
-      await db.execute(
-        sql`DELETE FROM appointments
-            WHERE slot_id IN (
-              SELECT id FROM appointment_slots
-              WHERE barber_id = ${barber.id}
-                AND date       = ${date}
-                AND (start_time, end_time) NOT IN (${STANDARD_PAIRS_SQL})
-            )`,
-      );
-      await db.execute(
-        sql`DELETE FROM appointment_slots
-            WHERE barber_id = ${barber.id}
-              AND date       = ${date}
-              AND (start_time, end_time) NOT IN (${STANDARD_PAIRS_SQL})`,
-      );
-
-      // ── Step 1: delete appointment-free slots ────────────────────────────────
-      // Only removes slots that have NO appointment row referencing them at all.
-      // Slots tied to any appointment (booked, cancelled, no-show, etc.) are kept.
-      const deleteResult = await db.execute(
-        sql`DELETE FROM appointment_slots
-            WHERE barber_id = ${barber.id}
-              AND date       = ${date}
-              AND id NOT IN (SELECT slot_id FROM appointments)
-            RETURNING id`,
-      );
-      const deleted = (deleteResult.rows ?? []).length;
-      totalDeleted += deleted;
-
-      // ── Step 2: find which standard start-times already exist ────────────────
-      // (could be appointment-linked slots that survived the delete above)
-      const surviving = await db
-        .select({ startTime: appointmentSlotsTable.startTime })
+      // Count existing slots for this day — if any exist, skip entirely
+      const existing = await db
+        .select({ id: appointmentSlotsTable.id })
         .from(appointmentSlotsTable)
         .where(
           and(
             eq(appointmentSlotsTable.barberId, barber.id),
             eq(appointmentSlotsTable.date, date),
           ),
-        );
-      const existingTimes = new Set(surviving.map((s) => s.startTime));
+        )
+        .limit(1);
 
-      // ── Step 3: insert only missing standard slots ───────────────────────────
-      const toInsert = DEFAULT_HOURS
-        .map((hour) => ({
-          barberId: barber.id,
-          date,
-          startTime: `${String(hour).padStart(2, "0")}:00`,
-          endTime:   `${String(hour + 1).padStart(2, "0")}:00`,
-          isAvailable: true,
-          isBooked:    false,
-        }))
-        .filter((s) => !existingTimes.has(s.startTime));
-
-      let inserted = 0;
-      if (toInsert.length > 0) {
-        await db.insert(appointmentSlotsTable).values(toInsert);
-        inserted = toInsert.length;
+      if (existing.length > 0) {
+        summary[date] = { inserted: 0, skipped: true };
+        req.log.info({ barberId: barber.id, date }, "seed-week: day has slots, skipped");
+        continue;
       }
-      totalInserted += inserted;
 
-      summary[date] = { deleted, inserted };
-      req.log.info({ barberId: barber.id, date, deleted, inserted }, "seed-week: date normalised");
+      // Day is empty — insert all 13 standard slots
+      const toInsert = DEFAULT_HOURS.map((hour) => ({
+        barberId: barber.id,
+        date,
+        startTime: `${String(hour).padStart(2, "0")}:00`,
+        endTime:   `${String(hour + 1).padStart(2, "0")}:00`,
+        isAvailable: true,
+        isBooked:    false,
+      }));
+
+      await db.insert(appointmentSlotsTable).values(toInsert);
+      totalInserted += toInsert.length;
+      summary[date] = { inserted: toInsert.length, skipped: false };
+      req.log.info({ barberId: barber.id, date, inserted: toInsert.length }, "seed-week: day seeded");
     }
 
-    req.log.info({ barberId: barber.id, totalDeleted, totalInserted }, "seed-week: completed");
-    res.json({ ok: true, totalDeleted, totalInserted, summary });
+    req.log.info({ barberId: barber.id, totalInserted }, "seed-week: completed");
+    res.json({ ok: true, totalInserted, summary });
   },
 );
 
