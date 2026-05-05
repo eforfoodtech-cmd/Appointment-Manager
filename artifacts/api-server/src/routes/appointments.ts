@@ -12,7 +12,7 @@ import {
   usersTable,
   noShowBlocksTable,
 } from "@workspace/db";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and, sql, gte, lte, inArray, not } from "drizzle-orm";
 import { authenticate, type AuthRequest } from "../middlewares/auth";
 
 const router = Router();
@@ -221,6 +221,37 @@ router.post("/", authenticate, async (req: AuthRequest, res) => {
     if (isBlocked) {
       res.status(400).json({
         error: "No-show nedeniyle bu berberden randevu alamazsınız",
+      });
+      return;
+    }
+
+    // ── Haftalık limit: bu 7 günlük pencerede zaten aktif randevu var mı? ──
+    const todayDate = new Date().toISOString().split("T")[0]!;
+    const limitDate = new Date(Date.now() + 6 * 24 * 60 * 60 * 1000)
+      .toISOString()
+      .split("T")[0]!;
+
+    const weeklyAppts = await db
+      .select({ id: appointmentsTable.id })
+      .from(appointmentsTable)
+      .innerJoin(
+        appointmentSlotsTable,
+        eq(appointmentSlotsTable.id, appointmentsTable.slotId),
+      )
+      .where(
+        and(
+          eq(appointmentsTable.customerId, customerId),
+          not(inArray(appointmentsTable.status, ["cancelled"])),
+          gte(appointmentSlotsTable.date, todayDate),
+          lte(appointmentSlotsTable.date, limitDate),
+        ),
+      )
+      .limit(1);
+
+    if (weeklyAppts.length > 0) {
+      res.status(400).json({
+        error:
+          "Bu hafta için zaten bir randevunuz var. Yeni randevu almak için mevcut randevunuzu iptal edin.",
       });
       return;
     }
