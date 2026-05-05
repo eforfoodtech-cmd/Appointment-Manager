@@ -766,6 +766,26 @@ components:
         - endTime
         - isActive
 
+    SlotAppointmentDetail:
+      type: object
+      properties:
+        id:
+          type: integer
+        notes:
+          type: string
+          nullable: true
+        status:
+          type: string
+        customerName:
+          type: string
+        customerPhone:
+          type: string
+          nullable: true
+      required:
+        - id
+        - status
+        - customerName
+
     AppointmentSlot:
       type: object
       properties:
@@ -786,6 +806,9 @@ components:
           type: boolean
         isBooked:
           type: boolean
+        appointment:
+          $ref: "#/components/schemas/SlotAppointmentDetail"
+          nullable: true
       required:
         - id
         - barberId

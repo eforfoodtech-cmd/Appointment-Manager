@@ -5,6 +5,7 @@
  * Tıraş - Barber Appointment SaaS API
  * OpenAPI spec version: 0.1.0
  */
+import type { SlotAppointmentDetail } from "./slotAppointmentDetail";
 
 export interface AppointmentSlot {
   id: number;
@@ -16,4 +17,5 @@ export interface AppointmentSlot {
   endTime: string;
   isAvailable: boolean;
   isBooked: boolean;
+  appointment?: SlotAppointmentDetail | null;
 }

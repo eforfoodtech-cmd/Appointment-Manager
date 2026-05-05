@@ -691,9 +691,31 @@ router.get("/:barberId/slots", async (req, res) => {
     return;
   }
 
-  const slots = await db
-    .select()
+  const rows = await db
+    .select({
+      id: appointmentSlotsTable.id,
+      barberId: appointmentSlotsTable.barberId,
+      date: appointmentSlotsTable.date,
+      startTime: appointmentSlotsTable.startTime,
+      endTime: appointmentSlotsTable.endTime,
+      isAvailable: appointmentSlotsTable.isAvailable,
+      isBooked: appointmentSlotsTable.isBooked,
+      appointmentId: appointmentsTable.id,
+      appointmentNotes: appointmentsTable.notes,
+      appointmentStatus: appointmentsTable.status,
+      customerName: sql<string>`cu.name`,
+      customerPhone: sql<string>`cu.phone`,
+    })
     .from(appointmentSlotsTable)
+    .leftJoin(
+      appointmentsTable,
+      and(
+        eq(appointmentsTable.slotId, appointmentSlotsTable.id),
+        sql`${appointmentsTable.status} NOT IN ('cancelled', 'no_show')`,
+      ),
+    )
+    .leftJoin(customersTable, eq(customersTable.id, appointmentsTable.customerId))
+    .leftJoin(sql`users cu`, sql`cu.id = ${customersTable.userId}`)
     .where(
       and(
         eq(appointmentSlotsTable.barberId, barberId),
@@ -701,6 +723,26 @@ router.get("/:barberId/slots", async (req, res) => {
       ),
     )
     .orderBy(appointmentSlotsTable.startTime);
+
+  const slots = rows.map((r) => ({
+    id: r.id,
+    barberId: r.barberId,
+    date: r.date,
+    startTime: r.startTime,
+    endTime: r.endTime,
+    isAvailable: r.isAvailable,
+    isBooked: r.isBooked,
+    appointment:
+      r.appointmentId != null
+        ? {
+            id: r.appointmentId,
+            notes: r.appointmentNotes,
+            status: r.appointmentStatus,
+            customerName: r.customerName,
+            customerPhone: r.customerPhone,
+          }
+        : null,
+  }));
 
   res.json(slots);
 });

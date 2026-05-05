@@ -1,6 +1,6 @@
 /**
  * Barber Slots — manage appointment slots by date.
- * Single-column list + bulk default slot creation (10:00–22:00).
+ * Booked slots show customer detail modal on tap.
  */
 import React, { useState } from "react";
 import {
@@ -15,6 +15,7 @@ import {
   ActivityIndicator,
   Platform,
   FlatList,
+  Linking,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
@@ -27,6 +28,7 @@ import {
   getGetBarberSlotsQueryKey,
   useGetMyBarberProfile,
 } from "@workspace/api-client-react";
+import type { SlotAppointmentDetail } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import colors from "@/constants/colors";
 
@@ -52,8 +54,109 @@ function formatDay(dateStr: string) {
   };
 }
 
-function pad(n: number) {
-  return String(n).padStart(2, "0");
+const STATUS_LABELS: Record<string, string> = {
+  pending: "Beklemede",
+  confirmed: "Onaylandı",
+  completed: "Tamamlandı",
+  cancelled: "İptal",
+  no_show: "Gelmedi",
+};
+
+const STATUS_COLORS: Record<string, string> = {
+  pending: "#F59E0B",
+  confirmed: "#10B981",
+  completed: "#6366F1",
+  cancelled: "#EF4444",
+  no_show: "#9CA3AF",
+};
+
+interface CustomerDetailModalProps {
+  visible: boolean;
+  slotTime: string;
+  appointment: SlotAppointmentDetail | null;
+  onClose: () => void;
+}
+
+function CustomerDetailModal({ visible, slotTime, appointment, onClose }: CustomerDetailModalProps) {
+  if (!appointment) return null;
+  const statusColor = STATUS_COLORS[appointment.status] ?? c.mutedForeground;
+  const statusLabel = STATUS_LABELS[appointment.status] ?? appointment.status;
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={onClose}>
+        <TouchableOpacity style={styles.detailModal} activeOpacity={1} onPress={() => {}}>
+          {/* Handle bar */}
+          <View style={styles.handleBar} />
+
+          <Text style={styles.detailTitle}>Randevu Detayı</Text>
+          <Text style={styles.detailSlotTime}>{slotTime}</Text>
+
+          {/* Status badge */}
+          <View style={[styles.statusBadge, { backgroundColor: statusColor + "20" }]}>
+            <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
+            <Text style={[styles.statusText, { color: statusColor }]}>{statusLabel}</Text>
+          </View>
+
+          {/* Customer info */}
+          <View style={styles.infoCard}>
+            <View style={styles.infoRow}>
+              <View style={styles.infoIconWrap}>
+                <Feather name="user" size={16} color={c.primary} />
+              </View>
+              <View style={styles.infoContent}>
+                <Text style={styles.infoLabel}>Müşteri</Text>
+                <Text style={styles.infoValue}>{appointment.customerName}</Text>
+              </View>
+            </View>
+
+            {appointment.customerPhone ? (
+              <TouchableOpacity
+                style={styles.infoRow}
+                onPress={() => Linking.openURL(`tel:${appointment.customerPhone}`)}
+                activeOpacity={0.7}
+              >
+                <View style={styles.infoIconWrap}>
+                  <Feather name="phone" size={16} color={c.primary} />
+                </View>
+                <View style={styles.infoContent}>
+                  <Text style={styles.infoLabel}>Telefon</Text>
+                  <Text style={[styles.infoValue, styles.infoLink]}>{appointment.customerPhone}</Text>
+                </View>
+                <Feather name="chevron-right" size={16} color={c.mutedForeground} />
+              </TouchableOpacity>
+            ) : (
+              <View style={styles.infoRow}>
+                <View style={styles.infoIconWrap}>
+                  <Feather name="phone" size={16} color={c.mutedForeground} />
+                </View>
+                <View style={styles.infoContent}>
+                  <Text style={styles.infoLabel}>Telefon</Text>
+                  <Text style={[styles.infoValue, { color: c.mutedForeground }]}>Belirtilmemiş</Text>
+                </View>
+              </View>
+            )}
+
+            <View style={[styles.infoRow, { borderBottomWidth: 0 }]}>
+              <View style={styles.infoIconWrap}>
+                <Feather name="file-text" size={16} color={c.primary} />
+              </View>
+              <View style={styles.infoContent}>
+                <Text style={styles.infoLabel}>Notlar</Text>
+                <Text style={styles.infoValue}>
+                  {appointment.notes?.trim() ? appointment.notes : "Not yok"}
+                </Text>
+              </View>
+            </View>
+          </View>
+
+          <TouchableOpacity style={styles.closeBtn} onPress={onClose} activeOpacity={0.8}>
+            <Text style={styles.closeBtnText}>Kapat</Text>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </TouchableOpacity>
+    </Modal>
+  );
 }
 
 export default function SlotsScreen() {
@@ -61,9 +164,15 @@ export default function SlotsScreen() {
   const queryClient = useQueryClient();
   const days = getNext7Days();
   const [selectedDate, setSelectedDate] = useState(days[0]!);
-  const [showModal, setShowModal] = useState(false);
+  const [showAddModal, setShowAddModal] = useState(false);
   const [startTime, setStartTime] = useState("09:00");
   const [endTime, setEndTime] = useState("10:00");
+
+  const [detailSlot, setDetailSlot] = useState<{
+    time: string;
+    appointment: SlotAppointmentDetail;
+  } | null>(null);
+
   const { data: profile } = useGetMyBarberProfile();
   const barberId = profile?.id;
 
@@ -78,29 +187,37 @@ export default function SlotsScreen() {
     },
   );
 
+  const invalidateSlots = () =>
+    queryClient.invalidateQueries({ queryKey: ["getBarberSlots"] });
+
   const createSlot = useCreateSlot({
     mutation: {
       onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: ["getBarberSlots"] });
-        setShowModal(false);
+        invalidateSlots();
+        setShowAddModal(false);
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       },
-      onError: (err: any) => Alert.alert("Hata", err?.data?.error || "Slot oluşturulamadı"),
+      onError: (err: any) =>
+        Alert.alert("Hata", err?.data?.error ?? "Slot oluşturulamadı"),
     },
   });
 
   const updateSlot = useUpdateSlot({
     mutation: {
-      onSuccess: () => queryClient.invalidateQueries({ queryKey: ["getBarberSlots"] }),
+      onSuccess: () => invalidateSlots(),
+      onError: (err: any) =>
+        Alert.alert("Hata", err?.data?.error ?? "Slot güncellenemedi"),
     },
   });
 
   const deleteSlot = useDeleteSlot({
     mutation: {
       onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: ["getBarberSlots"] });
+        invalidateSlots();
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
       },
+      onError: (err: any) =>
+        Alert.alert("Hata", err?.data?.error ?? "Slot silinemedi"),
     },
   });
 
@@ -116,11 +233,7 @@ export default function SlotsScreen() {
     updateSlot.mutate({ slotId, data: { isAvailable: !isAvailable } });
   };
 
-  const handleDelete = (slotId: number, isBooked: boolean) => {
-    if (isBooked) {
-      Alert.alert("Uyarı", "Dolu slot silinemez");
-      return;
-    }
+  const handleDelete = (slotId: number) => {
     Alert.alert("Sil", "Bu slotu silmek istediğinizden emin misiniz?", [
       { text: "İptal", style: "cancel" },
       {
@@ -129,6 +242,15 @@ export default function SlotsScreen() {
         onPress: () => deleteSlot.mutate({ slotId }),
       },
     ]);
+  };
+
+  const handleSlotPress = (slot: { startTime: string; endTime: string; isBooked: boolean; appointment?: SlotAppointmentDetail | null }) => {
+    if (slot.isBooked && slot.appointment) {
+      setDetailSlot({
+        time: `${slot.startTime} – ${slot.endTime}`,
+        appointment: slot.appointment,
+      });
+    }
   };
 
   const paddingTop = insets.top + (Platform.OS === "web" ? 67 : 0);
@@ -140,7 +262,7 @@ export default function SlotsScreen() {
         <Text style={styles.title}>Slotlar</Text>
         <TouchableOpacity
           style={styles.addBtn}
-          onPress={() => setShowModal(true)}
+          onPress={() => setShowAddModal(true)}
           activeOpacity={0.8}
         >
           <Feather name="plus" size={20} color="#fff" />
@@ -189,78 +311,98 @@ export default function SlotsScreen() {
             </View>
           }
           renderItem={({ item: slot }) => (
-            <View
-              style={[
-                styles.slotRow,
-                slot.isBooked && styles.slotRowBooked,
-                !slot.isAvailable && !slot.isBooked && styles.slotRowClosed,
-              ]}
+            <TouchableOpacity
+              activeOpacity={slot.isBooked ? 0.7 : 1}
+              onPress={() => handleSlotPress(slot)}
+              disabled={!slot.isBooked}
             >
-              {/* Time */}
-              <View style={styles.slotTimeCol}>
-                <Text style={[
-                  styles.slotTime,
-                  slot.isBooked && styles.slotTimeBooked,
-                  !slot.isAvailable && !slot.isBooked && styles.slotTimeClosed,
-                ]}>
-                  {slot.startTime}
-                </Text>
-                <Text style={[
-                  styles.slotEndTime,
-                  slot.isBooked && styles.slotTimeBooked,
-                  !slot.isAvailable && !slot.isBooked && styles.slotTimeClosed,
-                ]}>
-                  {slot.endTime}
-                </Text>
+              <View
+                style={[
+                  styles.slotRow,
+                  slot.isBooked && styles.slotRowBooked,
+                  !slot.isAvailable && !slot.isBooked && styles.slotRowClosed,
+                ]}
+              >
+                {/* Time */}
+                <View style={styles.slotTimeCol}>
+                  <Text style={[
+                    styles.slotTime,
+                    slot.isBooked && styles.slotTimeBooked,
+                    !slot.isAvailable && !slot.isBooked && styles.slotTimeClosed,
+                  ]}>
+                    {slot.startTime}
+                  </Text>
+                  <Text style={[
+                    styles.slotEndTime,
+                    slot.isBooked && styles.slotTimeBooked,
+                    !slot.isAvailable && !slot.isBooked && styles.slotTimeClosed,
+                  ]}>
+                    {slot.endTime}
+                  </Text>
+                </View>
+
+                {/* Status / customer */}
+                {slot.isBooked ? (
+                  <View style={styles.bookedInfo}>
+                    <View style={styles.badgeBooked}>
+                      <Text style={styles.badgeBookedText}>Dolu</Text>
+                    </View>
+                    {slot.appointment && (
+                      <Text style={styles.customerName} numberOfLines={1}>
+                        {slot.appointment.customerName}
+                      </Text>
+                    )}
+                  </View>
+                ) : slot.isAvailable ? (
+                  <View style={styles.badgeOpen}>
+                    <Text style={styles.badgeOpenText}>Müsait</Text>
+                  </View>
+                ) : (
+                  <View style={styles.badgeClosed}>
+                    <Text style={styles.badgeClosedText}>Kapalı</Text>
+                  </View>
+                )}
+
+                {/* Booked slot tap hint */}
+                {slot.isBooked && (
+                  <Feather name="chevron-right" size={16} color={c.primary} />
+                )}
+
+                {/* Actions for non-booked slots */}
+                {!slot.isBooked && (
+                  <View style={styles.slotActions}>
+                    <TouchableOpacity
+                      style={styles.iconBtn}
+                      onPress={() => handleToggle(slot.id, slot.isAvailable)}
+                      activeOpacity={0.7}
+                      disabled={updateSlot.isPending}
+                    >
+                      <Feather
+                        name={slot.isAvailable ? "eye" : "eye-off"}
+                        size={18}
+                        color={slot.isAvailable ? c.primary : c.mutedForeground}
+                      />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.iconBtn}
+                      onPress={() => handleDelete(slot.id)}
+                      activeOpacity={0.7}
+                      disabled={deleteSlot.isPending}
+                    >
+                      <Feather name="trash-2" size={18} color={c.destructive} />
+                    </TouchableOpacity>
+                  </View>
+                )}
               </View>
-
-              {/* Status badge */}
-              {slot.isBooked ? (
-                <View style={styles.badgeBooked}>
-                  <Text style={styles.badgeBookedText}>Dolu</Text>
-                </View>
-              ) : slot.isAvailable ? (
-                <View style={styles.badgeOpen}>
-                  <Text style={styles.badgeOpenText}>Müsait</Text>
-                </View>
-              ) : (
-                <View style={styles.badgeClosed}>
-                  <Text style={styles.badgeClosedText}>Kapalı</Text>
-                </View>
-              )}
-
-              {/* Actions */}
-              {!slot.isBooked && (
-                <View style={styles.slotActions}>
-                  <TouchableOpacity
-                    style={styles.iconBtn}
-                    onPress={() => handleToggle(slot.id, slot.isAvailable)}
-                    activeOpacity={0.7}
-                  >
-                    <Feather
-                      name={slot.isAvailable ? "eye" : "eye-off"}
-                      size={18}
-                      color={slot.isAvailable ? c.primary : c.mutedForeground}
-                    />
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.iconBtn}
-                    onPress={() => handleDelete(slot.id, slot.isBooked)}
-                    activeOpacity={0.7}
-                  >
-                    <Feather name="trash-2" size={18} color={c.destructive} />
-                  </TouchableOpacity>
-                </View>
-              )}
-            </View>
+            </TouchableOpacity>
           )}
         />
       )}
 
       {/* Add slot modal */}
-      <Modal visible={showModal} transparent animationType="slide">
+      <Modal visible={showAddModal} transparent animationType="slide">
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
+          <View style={styles.addModalContent}>
             <Text style={styles.modalTitle}>Yeni Slot Ekle</Text>
             <Text style={styles.modalDate}>{selectedDate}</Text>
 
@@ -290,7 +432,7 @@ export default function SlotsScreen() {
             <View style={styles.modalActions}>
               <TouchableOpacity
                 style={styles.modalCancel}
-                onPress={() => setShowModal(false)}
+                onPress={() => setShowAddModal(false)}
               >
                 <Text style={styles.modalCancelText}>İptal</Text>
               </TouchableOpacity>
@@ -309,6 +451,14 @@ export default function SlotsScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Customer detail modal */}
+      <CustomerDetailModal
+        visible={detailSlot !== null}
+        slotTime={detailSlot?.time ?? ""}
+        appointment={detailSlot?.appointment ?? null}
+        onClose={() => setDetailSlot(null)}
+      />
     </View>
   );
 }
@@ -372,6 +522,14 @@ const styles = StyleSheet.create({
   slotTimeBooked: { color: c.primary },
   slotTimeClosed: { color: c.mutedForeground },
 
+  bookedInfo: { flex: 1, flexDirection: "row", alignItems: "center", gap: 8 },
+  customerName: {
+    flex: 1,
+    fontSize: 13,
+    fontFamily: "Inter_500Medium",
+    color: c.primary,
+  },
+
   badgeOpen: {
     flex: 1,
     backgroundColor: "#D1FAE5",
@@ -382,7 +540,6 @@ const styles = StyleSheet.create({
   },
   badgeOpenText: { fontSize: 12, fontFamily: "Inter_600SemiBold", color: "#059669" },
   badgeBooked: {
-    flex: 1,
     backgroundColor: c.primary + "20",
     borderRadius: 6,
     paddingVertical: 4,
@@ -418,7 +575,7 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0,0,0,0.5)",
     justifyContent: "flex-end",
   },
-  modalContent: {
+  addModalContent: {
     backgroundColor: c.background,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
@@ -458,4 +615,100 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   modalConfirmText: { fontSize: 15, fontFamily: "Inter_600SemiBold", color: "#fff" },
+
+  // Customer detail modal
+  detailModal: {
+    backgroundColor: c.background,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    padding: 24,
+    gap: 16,
+  },
+  handleBar: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: c.border,
+    alignSelf: "center",
+    marginBottom: 4,
+  },
+  detailTitle: {
+    fontSize: 20,
+    fontFamily: "Inter_700Bold",
+    color: c.foreground,
+    textAlign: "center",
+  },
+  detailSlotTime: {
+    fontSize: 14,
+    fontFamily: "Inter_500Medium",
+    color: c.mutedForeground,
+    textAlign: "center",
+    marginTop: -8,
+  },
+  statusBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "center",
+    borderRadius: 20,
+    paddingVertical: 6,
+    paddingHorizontal: 14,
+    gap: 6,
+  },
+  statusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  statusText: {
+    fontSize: 13,
+    fontFamily: "Inter_600SemiBold",
+  },
+  infoCard: {
+    backgroundColor: c.card,
+    borderRadius: colors.radius,
+    borderWidth: 1,
+    borderColor: c.border,
+    overflow: "hidden",
+  },
+  infoRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 14,
+    gap: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: c.border,
+  },
+  infoIconWrap: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: c.primary + "15",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  infoContent: { flex: 1 },
+  infoLabel: {
+    fontSize: 11,
+    fontFamily: "Inter_400Regular",
+    color: c.mutedForeground,
+    marginBottom: 2,
+  },
+  infoValue: {
+    fontSize: 15,
+    fontFamily: "Inter_600SemiBold",
+    color: c.foreground,
+  },
+  infoLink: { color: c.primary },
+  closeBtn: {
+    backgroundColor: c.primary,
+    borderRadius: colors.radius,
+    paddingVertical: 14,
+    alignItems: "center",
+    marginTop: 4,
+  },
+  closeBtnText: {
+    fontSize: 15,
+    fontFamily: "Inter_600SemiBold",
+    color: "#fff",
+  },
 });

@@ -106,6 +106,14 @@ export interface AvailabilityInput {
   isActive: boolean;
 }
 
+export interface SlotAppointmentDetail {
+  id: number;
+  notes?: string | null;
+  status: string;
+  customerName: string;
+  customerPhone?: string | null;
+}
+
 export interface AppointmentSlot {
   id: number;
   barberId: number;
@@ -116,6 +124,7 @@ export interface AppointmentSlot {
   endTime: string;
   isAvailable: boolean;
   isBooked: boolean;
+  appointment?: SlotAppointmentDetail | null;
 }
 
 export interface CreateSlotRequest {

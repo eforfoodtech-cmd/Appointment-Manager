@@ -210,6 +210,15 @@ export const GetBarberSlotsResponseItem = zod.object({
   endTime: zod.string().describe("HH:MM format"),
   isAvailable: zod.boolean(),
   isBooked: zod.boolean(),
+  appointment: zod
+    .object({
+      id: zod.number(),
+      notes: zod.string().nullish(),
+      status: zod.string(),
+      customerName: zod.string(),
+      customerPhone: zod.string().nullish(),
+    })
+    .nullish(),
 });
 export const GetBarberSlotsResponse = zod.array(GetBarberSlotsResponseItem);
 
@@ -242,6 +251,15 @@ export const UpdateSlotResponse = zod.object({
   endTime: zod.string().describe("HH:MM format"),
   isAvailable: zod.boolean(),
   isBooked: zod.boolean(),
+  appointment: zod
+    .object({
+      id: zod.number(),
+      notes: zod.string().nullish(),
+      status: zod.string(),
+      customerName: zod.string(),
+      customerPhone: zod.string().nullish(),
+    })
+    .nullish(),
 });
 
 /**

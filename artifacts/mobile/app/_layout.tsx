@@ -34,15 +34,18 @@ const queryClient = new QueryClient({
 const AUTH_PATHS = ["/login", "/register"];
 
 function BarberSeeder() {
-  const { user } = useAuth();
+  const { user, token } = useAuth();
   const seededRef = useRef(false);
 
   useEffect(() => {
-    if (user?.role === "barber" && !seededRef.current) {
+    if (user?.role === "barber" && token && !seededRef.current) {
       seededRef.current = true;
-      customFetch("/api/barbers/me/slots/seed-week", { method: "POST" }).catch(() => {});
+      customFetch("/api/barbers/me/slots/seed-week", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      }).catch(() => {});
     }
-  }, [user]);
+  }, [user, token]);
 
   return null;
 }

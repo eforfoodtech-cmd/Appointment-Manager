@@ -28,6 +28,7 @@ export * from "./noShowBlock";
 export * from "./registerRequest";
 export * from "./registerRequestRole";
 export * from "./sendMessageRequest";
+export * from "./slotAppointmentDetail";
 export * from "./updateAppointmentRequest";
 export * from "./updateBarberRequest";
 export * from "./updateSlotRequest";
