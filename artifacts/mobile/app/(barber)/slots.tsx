@@ -1,6 +1,6 @@
 /**
  * Barber Slots — manage appointment slots by date.
- * Horizontal day scroll + slot buttons (Trendyol-style).
+ * Single-column list + bulk default slot creation (10:00–22:00).
  */
 import React, { useState } from "react";
 import {
@@ -32,6 +32,8 @@ import colors from "@/constants/colors";
 
 const c = colors.light;
 
+const DEFAULT_HOURS = Array.from({ length: 12 }, (_, i) => i + 10); // 10..21
+
 function getNext14Days() {
   const days = [];
   const today = new Date();
@@ -52,6 +54,10 @@ function formatDay(dateStr: string) {
   };
 }
 
+function pad(n: number) {
+  return String(n).padStart(2, "0");
+}
+
 export default function SlotsScreen() {
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
@@ -59,7 +65,8 @@ export default function SlotsScreen() {
   const [selectedDate, setSelectedDate] = useState(days[0]!);
   const [showModal, setShowModal] = useState(false);
   const [startTime, setStartTime] = useState("09:00");
-  const [endTime, setEndTime] = useState("09:30");
+  const [endTime, setEndTime] = useState("10:00");
+  const [isCreatingDefaults, setIsCreatingDefaults] = useState(false);
 
   const { data: profile } = useGetMyBarberProfile();
   const barberId = profile?.id;
@@ -106,6 +113,29 @@ export default function SlotsScreen() {
     createSlot.mutate({
       data: { date: selectedDate, startTime, endTime, isAvailable: true },
     });
+  };
+
+  const handleCreateDefaultSlots = async () => {
+    if (!barberId) return;
+    setIsCreatingDefaults(true);
+    try {
+      for (const hour of DEFAULT_HOURS) {
+        await createSlot.mutateAsync({
+          data: {
+            date: selectedDate,
+            startTime: `${pad(hour)}:00`,
+            endTime: `${pad(hour + 1)}:00`,
+            isAvailable: true,
+          },
+        });
+      }
+      queryClient.invalidateQueries({ queryKey: ["getBarberSlots"] });
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch (err: any) {
+      Alert.alert("Hata", err?.data?.error || "Varsayılan slotlar oluşturulamadı");
+    } finally {
+      setIsCreatingDefaults(false);
+    }
   };
 
   const handleToggle = (slotId: number, isAvailable: boolean) => {
@@ -168,48 +198,121 @@ export default function SlotsScreen() {
         })}
       </ScrollView>
 
-      {/* Slots */}
+      {/* Slots list */}
       {isLoading ? (
         <ActivityIndicator style={{ marginTop: 60 }} color={c.primary} />
       ) : (
         <FlatList
           data={slots ?? []}
           keyExtractor={(s) => String(s.id)}
-          numColumns={3}
-          contentContainerStyle={styles.slotGrid}
-          columnWrapperStyle={{ gap: 10 }}
+          contentContainerStyle={styles.slotList}
           ListEmptyComponent={
             <View style={styles.empty}>
               <Feather name="clock" size={40} color={c.border} />
               <Text style={styles.emptyText}>Bu gün için slot yok</Text>
-              <Text style={styles.emptySubtext}>Sağ üstteki + ile slot ekleyin</Text>
+
+              {/* Default slots button */}
+              <TouchableOpacity
+                style={[styles.defaultBtn, isCreatingDefaults && { opacity: 0.7 }]}
+                onPress={handleCreateDefaultSlots}
+                disabled={isCreatingDefaults}
+                activeOpacity={0.8}
+              >
+                {isCreatingDefaults ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <>
+                    <Feather name="zap" size={16} color="#fff" />
+                    <Text style={styles.defaultBtnText}>Varsayılan Saatleri Ekle (10:00–22:00)</Text>
+                  </>
+                )}
+              </TouchableOpacity>
             </View>
           }
+          ListHeaderComponent={
+            slots && slots.length > 0 ? (
+              <TouchableOpacity
+                style={[styles.defaultBtnSmall, isCreatingDefaults && { opacity: 0.7 }]}
+                onPress={handleCreateDefaultSlots}
+                disabled={isCreatingDefaults}
+                activeOpacity={0.8}
+              >
+                {isCreatingDefaults ? (
+                  <ActivityIndicator color={c.primary} size="small" />
+                ) : (
+                  <>
+                    <Feather name="zap" size={14} color={c.primary} />
+                    <Text style={styles.defaultBtnSmallText}>Varsayılan Saatleri Ekle</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            ) : null
+          }
           renderItem={({ item: slot }) => (
-            <TouchableOpacity
+            <View
               style={[
-                styles.slot,
-                slot.isBooked && styles.slotBooked,
-                !slot.isAvailable && !slot.isBooked && styles.slotClosed,
+                styles.slotRow,
+                slot.isBooked && styles.slotRowBooked,
+                !slot.isAvailable && !slot.isBooked && styles.slotRowClosed,
               ]}
-              onPress={() => !slot.isBooked && handleToggle(slot.id, slot.isAvailable)}
-              onLongPress={() => handleDelete(slot.id, slot.isBooked)}
-              activeOpacity={0.7}
             >
-              <Text style={[
-                styles.slotTime,
-                slot.isBooked && styles.slotTimeBooked,
-                !slot.isAvailable && !slot.isBooked && styles.slotTimeClosed,
-              ]}>
-                {slot.startTime}
-              </Text>
-              {slot.isBooked && (
-                <Text style={styles.slotTagBooked}>Dolu</Text>
+              {/* Time */}
+              <View style={styles.slotTimeCol}>
+                <Text style={[
+                  styles.slotTime,
+                  slot.isBooked && styles.slotTimeBooked,
+                  !slot.isAvailable && !slot.isBooked && styles.slotTimeClosed,
+                ]}>
+                  {slot.startTime}
+                </Text>
+                <Text style={[
+                  styles.slotEndTime,
+                  slot.isBooked && styles.slotTimeBooked,
+                  !slot.isAvailable && !slot.isBooked && styles.slotTimeClosed,
+                ]}>
+                  {slot.endTime}
+                </Text>
+              </View>
+
+              {/* Status badge */}
+              {slot.isBooked ? (
+                <View style={styles.badgeBooked}>
+                  <Text style={styles.badgeBookedText}>Dolu</Text>
+                </View>
+              ) : slot.isAvailable ? (
+                <View style={styles.badgeOpen}>
+                  <Text style={styles.badgeOpenText}>Müsait</Text>
+                </View>
+              ) : (
+                <View style={styles.badgeClosed}>
+                  <Text style={styles.badgeClosedText}>Kapalı</Text>
+                </View>
               )}
-              {!slot.isAvailable && !slot.isBooked && (
-                <Feather name="lock" size={12} color={c.mutedForeground} />
+
+              {/* Actions */}
+              {!slot.isBooked && (
+                <View style={styles.slotActions}>
+                  <TouchableOpacity
+                    style={styles.iconBtn}
+                    onPress={() => handleToggle(slot.id, slot.isAvailable)}
+                    activeOpacity={0.7}
+                  >
+                    <Feather
+                      name={slot.isAvailable ? "eye" : "eye-off"}
+                      size={18}
+                      color={slot.isAvailable ? c.primary : c.mutedForeground}
+                    />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.iconBtn}
+                    onPress={() => handleDelete(slot.id, slot.isBooked)}
+                    activeOpacity={0.7}
+                  >
+                    <Feather name="trash-2" size={18} color={c.destructive} />
+                  </TouchableOpacity>
+                </View>
               )}
-            </TouchableOpacity>
+            </View>
           )}
         />
       )}
@@ -238,7 +341,7 @@ export default function SlotsScreen() {
                   style={styles.timeInput}
                   value={endTime}
                   onChangeText={setEndTime}
-                  placeholder="09:30"
+                  placeholder="10:00"
                   placeholderTextColor={c.mutedForeground}
                 />
               </View>
@@ -299,36 +402,104 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: c.border,
   },
-  dayBtnActive: {
-    backgroundColor: c.primary,
-    borderColor: c.primary,
-  },
+  dayBtnActive: { backgroundColor: c.primary, borderColor: c.primary },
   dayName: { fontSize: 11, fontFamily: "Inter_500Medium", color: c.mutedForeground },
   dayNameActive: { color: "rgba(255,255,255,0.8)" },
   dayDate: { fontSize: 18, fontFamily: "Inter_700Bold", color: c.foreground },
   dayDateActive: { color: "#fff" },
   dayMonth: { fontSize: 10, fontFamily: "Inter_400Regular", color: c.mutedForeground },
   dayMonthActive: { color: "rgba(255,255,255,0.7)" },
-  slotGrid: { paddingHorizontal: 16, gap: 10 },
-  slot: {
-    flex: 1,
+
+  slotList: { paddingHorizontal: 16, paddingBottom: 40, gap: 8 },
+
+  slotRow: {
+    flexDirection: "row",
+    alignItems: "center",
     backgroundColor: c.card,
     borderRadius: colors.radius,
     paddingVertical: 14,
-    alignItems: "center",
+    paddingHorizontal: 16,
     borderWidth: 1.5,
     borderColor: c.border,
-    gap: 4,
+    gap: 12,
   },
-  slotBooked: { backgroundColor: c.primary, borderColor: c.primary },
-  slotClosed: { backgroundColor: c.secondary, borderColor: c.border, opacity: 0.7 },
-  slotTime: { fontSize: 13, fontFamily: "Inter_600SemiBold", color: c.foreground },
-  slotTimeBooked: { color: "#fff" },
+  slotRowBooked: { backgroundColor: c.primary + "18", borderColor: c.primary + "60" },
+  slotRowClosed: { backgroundColor: c.secondary, opacity: 0.75 },
+
+  slotTimeCol: { width: 56 },
+  slotTime: { fontSize: 15, fontFamily: "Inter_700Bold", color: c.foreground },
+  slotEndTime: { fontSize: 12, fontFamily: "Inter_400Regular", color: c.mutedForeground, marginTop: 1 },
+  slotTimeBooked: { color: c.primary },
   slotTimeClosed: { color: c.mutedForeground },
-  slotTagBooked: { fontSize: 10, fontFamily: "Inter_600SemiBold", color: "rgba(255,255,255,0.85)" },
-  empty: { alignItems: "center", paddingVertical: 60, gap: 12 },
+
+  badgeOpen: {
+    flex: 1,
+    backgroundColor: "#D1FAE5",
+    borderRadius: 6,
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    alignSelf: "center",
+  },
+  badgeOpenText: { fontSize: 12, fontFamily: "Inter_600SemiBold", color: "#059669" },
+  badgeBooked: {
+    flex: 1,
+    backgroundColor: c.primary + "20",
+    borderRadius: 6,
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    alignSelf: "center",
+  },
+  badgeBookedText: { fontSize: 12, fontFamily: "Inter_600SemiBold", color: c.primary },
+  badgeClosed: {
+    flex: 1,
+    backgroundColor: c.secondary,
+    borderRadius: 6,
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    alignSelf: "center",
+  },
+  badgeClosedText: { fontSize: 12, fontFamily: "Inter_600SemiBold", color: c.mutedForeground },
+
+  slotActions: { flexDirection: "row", gap: 4 },
+  iconBtn: {
+    width: 36,
+    height: 36,
+    justifyContent: "center",
+    alignItems: "center",
+    borderRadius: 8,
+    backgroundColor: c.background,
+  },
+
+  empty: { alignItems: "center", paddingVertical: 40, gap: 16 },
   emptyText: { fontSize: 15, fontFamily: "Inter_500Medium", color: c.mutedForeground },
-  emptySubtext: { fontSize: 13, fontFamily: "Inter_400Regular", color: c.mutedForeground },
+
+  defaultBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: c.primary,
+    borderRadius: colors.radius,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    marginTop: 8,
+  },
+  defaultBtnText: { fontSize: 14, fontFamily: "Inter_600SemiBold", color: "#fff" },
+
+  defaultBtnSmall: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    alignSelf: "flex-start",
+    backgroundColor: c.primary + "15",
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: c.primary + "40",
+  },
+  defaultBtnSmallText: { fontSize: 13, fontFamily: "Inter_600SemiBold", color: c.primary },
+
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.5)",
