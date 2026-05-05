@@ -12,6 +12,7 @@ import {
   Platform,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { router } from "expo-router";
 import { Feather } from "@expo/vector-icons";
 import { useAuth } from "@/context/AuthContext";
 import colors from "@/constants/colors";
@@ -64,7 +65,7 @@ export default function CustomerProfile() {
         onPress={() =>
           Alert.alert("Çıkış", "Hesabınızdan çıkmak istiyor musunuz?", [
             { text: "İptal", style: "cancel" },
-            { text: "Çıkış Yap", style: "destructive", onPress: logout },
+            { text: "Çıkış Yap", style: "destructive", onPress: async () => { await logout(); router.replace("/(auth)/login"); } },
           ])
         }
         activeOpacity={0.8}
