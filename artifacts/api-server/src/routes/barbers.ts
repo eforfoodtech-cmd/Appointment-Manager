@@ -441,6 +441,7 @@ router.get(
       .innerJoin(usersTable, eq(usersTable.id, customersTable.userId))
       .where(eq(noShowBlocksTable.barberId, barber.id));
 
+    res.set("Cache-Control", "no-store");
     res.json(blocks);
   },
 );

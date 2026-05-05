@@ -66,11 +66,13 @@ export default function BarberProfile() {
   const handleRemoveBlock = async (blockId: number) => {
     try {
       await removeBlock.mutateAsync({ blockId });
+      // Optimistic: immediately remove from UI
       queryClient.setQueryData(
         getListBlocksQueryKey(),
         (old: any[] | undefined) => old?.filter((b) => b.id !== blockId) ?? [],
       );
-      await queryClient.refetchQueries({ queryKey: getListBlocksQueryKey() });
+      // Mark stale so next focus/mount fetches fresh (no-store header ensures no browser cache)
+      queryClient.invalidateQueries({ queryKey: getListBlocksQueryKey() });
     } catch (err: any) {
       Alert.alert("Hata", err?.data?.error || "Engel kaldırılamadı");
     }
