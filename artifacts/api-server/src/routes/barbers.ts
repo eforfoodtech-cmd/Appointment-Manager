@@ -293,8 +293,8 @@ router.get(
 );
 
 // ─── POST /api/barbers/me/slots/seed-week ─────────────────────────────────────
-// Creates default hourly slots (10:00–22:00) for any of the next 7 days that
-// currently have zero slots.  Idempotent: days that already have slots are skipped.
+// Normalises the next 7 days: removes all UN-BOOKED slots, then inserts 13
+// clean hourly slots (10:00–23:00) per day.  Booked slots are never touched.
 router.post(
   "/me/slots/seed-week",
   authenticate,
@@ -319,37 +319,34 @@ router.post(
       dates.push(d.toISOString().split("T")[0]!);
     }
 
-    const DEFAULT_HOURS = Array.from({ length: 12 }, (_, i) => i + 10); // 10..21
-    let seededDates = 0;
+    // 13 hourly slots: 10:00–11:00 … 22:00–23:00
+    const DEFAULT_HOURS = Array.from({ length: 13 }, (_, i) => i + 10);
 
     for (const date of dates) {
-      const [existing] = await db
-        .select({ id: appointmentSlotsTable.id })
-        .from(appointmentSlotsTable)
-        .where(
-          and(
-            eq(appointmentSlotsTable.barberId, barber.id),
-            eq(appointmentSlotsTable.date, date),
-          ),
-        )
-        .limit(1);
+      // Delete slots that have NO appointment references (safe even with FK constraint).
+      // This removes duplicates and old custom slots while keeping any slot
+      // that a cancelled/no-show/completed appointment still points to.
+      await db.execute(
+        sql`DELETE FROM appointment_slots
+            WHERE barber_id = ${barber.id}
+              AND date = ${date}
+              AND id NOT IN (SELECT slot_id FROM appointments)`,
+      );
 
-      if (!existing) {
-        await db.insert(appointmentSlotsTable).values(
-          DEFAULT_HOURS.map((hour) => ({
-            barberId: barber.id,
-            date,
-            startTime: `${String(hour).padStart(2, "0")}:00`,
-            endTime: `${String(hour + 1).padStart(2, "0")}:00`,
-            isAvailable: true,
-            isBooked: false,
-          })),
-        );
-        seededDates++;
-      }
+      // Insert 13 clean hourly slots
+      await db.insert(appointmentSlotsTable).values(
+        DEFAULT_HOURS.map((hour) => ({
+          barberId: barber.id,
+          date,
+          startTime: `${String(hour).padStart(2, "0")}:00`,
+          endTime: `${String(hour + 1).padStart(2, "0")}:00`,
+          isAvailable: true,
+          isBooked: false,
+        })),
+      );
     }
 
-    res.json({ seededDates, dates });
+    res.json({ ok: true, dates });
   },
 );
 
