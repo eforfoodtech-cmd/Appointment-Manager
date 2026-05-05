@@ -516,15 +516,33 @@ router.delete(
 
     const slotId = Number(req.params["slotId"]);
 
-    await db
-      .delete(appointmentSlotsTable)
+    // Verify slot belongs to this barber and is not booked
+    const [slot] = await db
+      .select({ id: appointmentSlotsTable.id })
+      .from(appointmentSlotsTable)
       .where(
         and(
           eq(appointmentSlotsTable.id, slotId),
           eq(appointmentSlotsTable.barberId, barber.id),
           eq(appointmentSlotsTable.isBooked, false),
         ),
-      );
+      )
+      .limit(1);
+
+    if (!slot) {
+      res.status(404).json({ error: "Slot bulunamadı veya dolu slot silinemez" });
+      return;
+    }
+
+    // Delete any cancelled/no_show appointments referencing this slot
+    // (active appointments are blocked by isBooked=false check above)
+    await db
+      .delete(appointmentsTable)
+      .where(eq(appointmentsTable.slotId, slotId));
+
+    await db
+      .delete(appointmentSlotsTable)
+      .where(eq(appointmentSlotsTable.id, slotId));
 
     res.status(204).send();
   },
