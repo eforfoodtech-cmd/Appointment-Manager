@@ -19,5 +19,8 @@ export interface Availability {
   startTime: string;
   /** HH:MM format */
   endTime: string;
-  isActive: boolean;
+  /** Whether this day is open for appointments */
+  isOpen: boolean;
+  /** Slot length in minutes (e.g. 30, 45, 60) */
+  slotDuration: number;
 }

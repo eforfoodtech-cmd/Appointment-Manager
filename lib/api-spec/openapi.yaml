@@ -737,15 +737,20 @@ components:
         endTime:
           type: string
           description: HH:MM format
-        isActive:
+        isOpen:
           type: boolean
+          description: Whether this day is open for appointments
+        slotDuration:
+          type: integer
+          description: Slot length in minutes (e.g. 30, 45, 60)
       required:
         - id
         - barberId
         - dayOfWeek
         - startTime
         - endTime
-        - isActive
+        - isOpen
+        - slotDuration
 
     AvailabilityInput:
       type: object
@@ -758,13 +763,17 @@ components:
           type: string
         endTime:
           type: string
-        isActive:
+        isOpen:
           type: boolean
+        slotDuration:
+          type: integer
+          description: Slot length in minutes
       required:
         - dayOfWeek
         - startTime
         - endTime
-        - isActive
+        - isOpen
+        - slotDuration
 
     SlotAppointmentDetail:
       type: object

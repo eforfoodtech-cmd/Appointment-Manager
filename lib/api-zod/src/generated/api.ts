@@ -149,7 +149,10 @@ export const GetMyAvailabilityResponseItem = zod.object({
     .describe("0=Sunday, 1=Monday, ..., 6=Saturday"),
   startTime: zod.string().describe("HH:MM format"),
   endTime: zod.string().describe("HH:MM format"),
-  isActive: zod.boolean(),
+  isOpen: zod.boolean().describe("Whether this day is open for appointments"),
+  slotDuration: zod
+    .number()
+    .describe("Slot length in minutes (e.g. 30, 45, 60)"),
 });
 export const GetMyAvailabilityResponse = zod.array(
   GetMyAvailabilityResponseItem,
@@ -168,7 +171,8 @@ export const SetMyAvailabilityBodyItem = zod.object({
     .max(setMyAvailabilityBodyDayOfWeekMax),
   startTime: zod.string(),
   endTime: zod.string(),
-  isActive: zod.boolean(),
+  isOpen: zod.boolean(),
+  slotDuration: zod.number().describe("Slot length in minutes"),
 });
 export const SetMyAvailabilityBody = zod.array(SetMyAvailabilityBodyItem);
 
@@ -185,7 +189,10 @@ export const SetMyAvailabilityResponseItem = zod.object({
     .describe("0=Sunday, 1=Monday, ..., 6=Saturday"),
   startTime: zod.string().describe("HH:MM format"),
   endTime: zod.string().describe("HH:MM format"),
-  isActive: zod.boolean(),
+  isOpen: zod.boolean().describe("Whether this day is open for appointments"),
+  slotDuration: zod
+    .number()
+    .describe("Slot length in minutes (e.g. 30, 45, 60)"),
 });
 export const SetMyAvailabilityResponse = zod.array(
   SetMyAvailabilityResponseItem,

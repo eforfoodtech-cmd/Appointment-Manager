@@ -14,5 +14,7 @@ export interface AvailabilityInput {
   dayOfWeek: number;
   startTime: string;
   endTime: string;
-  isActive: boolean;
+  isOpen: boolean;
+  /** Slot length in minutes */
+  slotDuration: number;
 }

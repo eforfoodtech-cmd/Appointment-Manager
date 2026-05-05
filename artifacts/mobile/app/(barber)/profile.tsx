@@ -1,5 +1,5 @@
 /**
- * Barber Profile — edit shop info and manage no-show blocks.
+ * Barber Profile — edit shop info, manage weekly schedule template, and no-show blocks.
  */
 import React, { useState, useEffect } from "react";
 import {
@@ -7,6 +7,7 @@ import {
   Text,
   ScrollView,
   TouchableOpacity,
+  Switch,
   StyleSheet,
   TextInput,
   ActivityIndicator,
@@ -21,27 +22,58 @@ import {
   useUpdateMyBarberProfile,
   useListBlocks,
   useRemoveBlock,
+  useGetMyAvailability,
+  useSetMyAvailability,
   getGetMyBarberProfileQueryKey,
   getListBlocksQueryKey,
+  getGetMyAvailabilityQueryKey,
 } from "@workspace/api-client-react";
+import type { AvailabilityInput } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/context/AuthContext";
 import colors from "@/constants/colors";
 
 const c = colors.light;
 
+const DAY_NAMES = ["Pazar", "Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi"];
+const DAY_SHORT = ["Paz", "Pzt", "Sal", "Çar", "Per", "Cum", "Cmt"];
+const DURATION_OPTIONS = [30, 45, 60, 90];
+
+const DEFAULT_TEMPLATE: AvailabilityInput[] = [0, 1, 2, 3, 4, 5, 6].map((d) => ({
+  dayOfWeek: d,
+  startTime: "10:00",
+  endTime: "22:00",
+  isOpen: d >= 1 && d <= 6, // Mon–Sat open, Sun closed
+  slotDuration: 60,
+}));
+
+type DayRow = {
+  dayOfWeek: number;
+  isOpen: boolean;
+  startTime: string;
+  endTime: string;
+  slotDuration: number;
+};
+
 export default function BarberProfile() {
   const insets = useSafeAreaInsets();
   const { user, logout } = useAuth();
   const queryClient = useQueryClient();
   const [editMode, setEditMode] = useState(false);
+  const [scheduleEditing, setScheduleEditing] = useState(false);
 
   const { data: profile, isLoading } = useGetMyBarberProfile();
   const { data: blocks } = useListBlocks();
+  const { data: availabilityData } = useGetMyAvailability();
 
   const [shopName, setShopName] = useState("");
   const [shopAddress, setShopAddress] = useState("");
   const [bio, setBio] = useState("");
+
+  // Weekly schedule state — 7 rows, one per day
+  const [schedule, setSchedule] = useState<DayRow[]>(
+    DEFAULT_TEMPLATE.map((t) => ({ ...t })),
+  );
 
   useEffect(() => {
     if (profile) {
@@ -50,6 +82,28 @@ export default function BarberProfile() {
       setBio(profile.bio || "");
     }
   }, [profile]);
+
+  useEffect(() => {
+    if (availabilityData && availabilityData.length > 0) {
+      // Build a map from the server data, fill in defaults for missing days
+      const map = new Map(availabilityData.map((a) => [a.dayOfWeek, a]));
+      setSchedule(
+        [0, 1, 2, 3, 4, 5, 6].map((d) => {
+          const row = map.get(d);
+          if (row) {
+            return {
+              dayOfWeek: d,
+              isOpen: row.isOpen,
+              startTime: row.startTime,
+              endTime: row.endTime,
+              slotDuration: row.slotDuration,
+            };
+          }
+          return { ...DEFAULT_TEMPLATE[d]! };
+        }),
+      );
+    }
+  }, [availabilityData]);
 
   const updateProfile = useUpdateMyBarberProfile({
     mutation: {
@@ -61,17 +115,25 @@ export default function BarberProfile() {
     },
   });
 
+  const setAvailability = useSetMyAvailability({
+    mutation: {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getGetMyAvailabilityQueryKey() });
+        setScheduleEditing(false);
+      },
+      onError: (err: any) => Alert.alert("Hata", err?.data?.error || "Program kaydedilemedi"),
+    },
+  });
+
   const removeBlock = useRemoveBlock();
 
   const handleRemoveBlock = async (blockId: number) => {
     try {
       await removeBlock.mutateAsync({ blockId });
-      // Optimistic: immediately remove from UI
       queryClient.setQueryData(
         getListBlocksQueryKey(),
         (old: any[] | undefined) => old?.filter((b) => b.id !== blockId) ?? [],
       );
-      // Mark stale so next focus/mount fetches fresh (no-store header ensures no browser cache)
       queryClient.invalidateQueries({ queryKey: getListBlocksQueryKey() });
     } catch (err: any) {
       Alert.alert("Hata", err?.data?.error || "Engel kaldırılamadı");
@@ -90,6 +152,24 @@ export default function BarberProfile() {
         bio: bio.trim() || undefined,
       },
     });
+  };
+
+  const handleSaveSchedule = () => {
+    setAvailability.mutate({
+      data: schedule.map((row) => ({
+        dayOfWeek: row.dayOfWeek,
+        isOpen: row.isOpen,
+        startTime: row.startTime,
+        endTime: row.endTime,
+        slotDuration: row.slotDuration,
+      })),
+    });
+  };
+
+  const updateDay = (dayOfWeek: number, patch: Partial<DayRow>) => {
+    setSchedule((prev) =>
+      prev.map((row) => (row.dayOfWeek === dayOfWeek ? { ...row, ...patch } : row)),
+    );
   };
 
   const paddingTop = insets.top + (Platform.OS === "web" ? 67 : 0);
@@ -159,6 +239,61 @@ export default function BarberProfile() {
         />
       </View>
 
+      {/* Weekly Schedule Template */}
+      <View style={styles.section}>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Haftalık Program</Text>
+          <TouchableOpacity
+            style={[styles.scheduleEditBtn, scheduleEditing && styles.scheduleEditBtnActive]}
+            onPress={() => (scheduleEditing ? handleSaveSchedule() : setScheduleEditing(true))}
+            activeOpacity={0.8}
+          >
+            {setAvailability.isPending ? (
+              <ActivityIndicator color={scheduleEditing ? "#fff" : c.primary} size="small" />
+            ) : (
+              <Text style={[styles.scheduleEditBtnText, scheduleEditing && styles.scheduleEditBtnTextActive]}>
+                {scheduleEditing ? "Kaydet" : "Düzenle"}
+              </Text>
+            )}
+          </TouchableOpacity>
+        </View>
+
+        <Text style={styles.scheduleHint}>
+          Seed-week bu programa göre yeni günler oluşturur.
+        </Text>
+
+        {schedule.map((row) => (
+          <DayScheduleRow
+            key={row.dayOfWeek}
+            row={row}
+            editing={scheduleEditing}
+            onUpdate={(patch) => updateDay(row.dayOfWeek, patch)}
+          />
+        ))}
+
+        {scheduleEditing && (
+          <TouchableOpacity
+            style={styles.cancelScheduleBtn}
+            onPress={() => {
+              setScheduleEditing(false);
+              // Revert to server data
+              if (availabilityData && availabilityData.length > 0) {
+                const map = new Map(availabilityData.map((a) => [a.dayOfWeek, a]));
+                setSchedule(
+                  [0, 1, 2, 3, 4, 5, 6].map((d) => {
+                    const r = map.get(d);
+                    return r ? { dayOfWeek: d, isOpen: r.isOpen, startTime: r.startTime, endTime: r.endTime, slotDuration: r.slotDuration } : { ...DEFAULT_TEMPLATE[d]! };
+                  }),
+                );
+              }
+            }}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.cancelScheduleBtnText}>İptal</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+
       {/* No-show blocks */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Engellenen Müşteriler</Text>
@@ -209,7 +344,6 @@ export default function BarberProfile() {
               onPress: async () => {
                 await logout();
                 if (Platform.OS === "web") {
-                  // Most reliable on web: full page reload clears all state
                   (window as Window & typeof globalThis).location.href = "/";
                 } else {
                   router.replace("/");
@@ -224,6 +358,92 @@ export default function BarberProfile() {
         <Text style={styles.logoutText}>Çıkış Yap</Text>
       </TouchableOpacity>
     </ScrollView>
+  );
+}
+
+function DayScheduleRow({
+  row,
+  editing,
+  onUpdate,
+}: {
+  row: DayRow;
+  editing: boolean;
+  onUpdate: (patch: Partial<DayRow>) => void;
+}) {
+  return (
+    <View style={[styles.dayRow, !row.isOpen && styles.dayRowClosed]}>
+      <View style={styles.dayRowHeader}>
+        <Text style={[styles.dayName, !row.isOpen && styles.dayNameClosed]}>
+          {DAY_NAMES[row.dayOfWeek]}
+        </Text>
+        {editing ? (
+          <Switch
+            value={row.isOpen}
+            onValueChange={(v) => onUpdate({ isOpen: v })}
+            trackColor={{ false: c.border, true: c.primary + "80" }}
+            thumbColor={row.isOpen ? c.primary : c.mutedForeground}
+          />
+        ) : (
+          <View style={[styles.dayStatusBadge, row.isOpen ? styles.dayStatusOpen : styles.dayStatusClosed]}>
+            <Text style={[styles.dayStatusText, row.isOpen ? styles.dayStatusOpenText : styles.dayStatusClosedText]}>
+              {row.isOpen ? "Açık" : "Kapalı"}
+            </Text>
+          </View>
+        )}
+      </View>
+
+      {row.isOpen && (
+        <View style={styles.dayRowDetails}>
+          {editing ? (
+            <>
+              <View style={styles.timeFieldRow}>
+                <View style={styles.timeField}>
+                  <Text style={styles.timeFieldLabel}>Açılış</Text>
+                  <TextInput
+                    style={styles.timeFieldInput}
+                    value={row.startTime}
+                    onChangeText={(v) => onUpdate({ startTime: v })}
+                    placeholder="09:00"
+                    placeholderTextColor={c.mutedForeground}
+                  />
+                </View>
+                <View style={styles.timeField}>
+                  <Text style={styles.timeFieldLabel}>Kapanış</Text>
+                  <TextInput
+                    style={styles.timeFieldInput}
+                    value={row.endTime}
+                    onChangeText={(v) => onUpdate({ endTime: v })}
+                    placeholder="22:00"
+                    placeholderTextColor={c.mutedForeground}
+                  />
+                </View>
+              </View>
+              <View style={styles.durationRow}>
+                <Text style={styles.timeFieldLabel}>Slot süresi</Text>
+                <View style={styles.durationOptions}>
+                  {DURATION_OPTIONS.map((d) => (
+                    <TouchableOpacity
+                      key={d}
+                      style={[styles.durationBtn, row.slotDuration === d && styles.durationBtnActive]}
+                      onPress={() => onUpdate({ slotDuration: d })}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={[styles.durationBtnText, row.slotDuration === d && styles.durationBtnTextActive]}>
+                        {d}dk
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+            </>
+          ) : (
+            <Text style={styles.dayRowSummary}>
+              {row.startTime} – {row.endTime} · {row.slotDuration} dk
+            </Text>
+          )}
+        </View>
+      )}
+    </View>
   );
 }
 
@@ -314,7 +534,105 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: c.border,
   },
+  sectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 4,
+  },
   sectionTitle: { fontSize: 14, fontFamily: "Inter_700Bold", color: c.foreground, marginBottom: 16 },
+  scheduleHint: {
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
+    color: c.mutedForeground,
+    marginBottom: 14,
+    marginTop: -10,
+  },
+  scheduleEditBtn: {
+    borderWidth: 1,
+    borderColor: c.primary,
+    borderRadius: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    marginBottom: 16,
+  },
+  scheduleEditBtnActive: { backgroundColor: c.primary },
+  scheduleEditBtnText: { fontSize: 13, fontFamily: "Inter_600SemiBold", color: c.primary },
+  scheduleEditBtnTextActive: { color: "#fff" },
+  cancelScheduleBtn: {
+    marginTop: 8,
+    alignItems: "center",
+    paddingVertical: 10,
+  },
+  cancelScheduleBtnText: {
+    fontSize: 14,
+    fontFamily: "Inter_500Medium",
+    color: c.mutedForeground,
+  },
+
+  // Day rows
+  dayRow: {
+    borderTopWidth: 1,
+    borderTopColor: c.border,
+    paddingTop: 12,
+    paddingBottom: 4,
+    gap: 8,
+  },
+  dayRowClosed: { opacity: 0.6 },
+  dayRowHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  dayName: { fontSize: 15, fontFamily: "Inter_600SemiBold", color: c.foreground },
+  dayNameClosed: { color: c.mutedForeground },
+  dayStatusBadge: {
+    borderRadius: 6,
+    paddingVertical: 3,
+    paddingHorizontal: 10,
+  },
+  dayStatusOpen: { backgroundColor: "#D1FAE5" },
+  dayStatusClosed: { backgroundColor: c.secondary },
+  dayStatusText: { fontSize: 12, fontFamily: "Inter_600SemiBold" },
+  dayStatusOpenText: { color: "#059669" },
+  dayStatusClosedText: { color: c.mutedForeground },
+
+  dayRowDetails: { paddingBottom: 8, gap: 10 },
+  dayRowSummary: {
+    fontSize: 13,
+    fontFamily: "Inter_400Regular",
+    color: c.mutedForeground,
+    paddingBottom: 4,
+  },
+  timeFieldRow: { flexDirection: "row", gap: 12 },
+  timeField: { flex: 1, gap: 4 },
+  timeFieldLabel: { fontSize: 12, fontFamily: "Inter_500Medium", color: c.mutedForeground },
+  timeFieldInput: {
+    backgroundColor: c.secondary,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    fontSize: 14,
+    fontFamily: "Inter_600SemiBold",
+    color: c.foreground,
+    borderWidth: 1,
+    borderColor: c.border,
+    textAlign: "center",
+  },
+  durationRow: { gap: 6 },
+  durationOptions: { flexDirection: "row", gap: 8 },
+  durationBtn: {
+    borderWidth: 1,
+    borderColor: c.border,
+    borderRadius: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    backgroundColor: c.background,
+  },
+  durationBtnActive: { borderColor: c.primary, backgroundColor: c.primary + "15" },
+  durationBtnText: { fontSize: 13, fontFamily: "Inter_500Medium", color: c.foreground },
+  durationBtnTextActive: { color: c.primary, fontFamily: "Inter_700Bold" },
+
   noBlocks: { fontSize: 14, fontFamily: "Inter_400Regular", color: c.mutedForeground },
   blockRow: {
     flexDirection: "row",

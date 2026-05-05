@@ -144,7 +144,8 @@ router.get(
     const avail = await db
       .select()
       .from(availabilityTable)
-      .where(eq(availabilityTable.barberId, barber.id));
+      .where(eq(availabilityTable.barberId, barber.id))
+      .orderBy(availabilityTable.dayOfWeek);
 
     res.json(avail);
   },
@@ -167,7 +168,7 @@ router.put(
       return;
     }
 
-    // Replace all availability records
+    // Replace all availability records with full upsert
     await db
       .delete(availabilityTable)
       .where(eq(availabilityTable.barberId, barber.id));
@@ -176,7 +177,8 @@ router.put(
       dayOfWeek: number;
       startTime: string;
       endTime: string;
-      isActive: boolean;
+      isOpen: boolean;
+      slotDuration: number;
     }> = req.body;
 
     if (!items || !Array.isArray(items) || items.length === 0) {
@@ -192,7 +194,8 @@ router.put(
           dayOfWeek: item.dayOfWeek,
           startTime: item.startTime,
           endTime: item.endTime,
-          isActive: item.isActive ?? true,
+          isOpen: item.isOpen ?? true,
+          slotDuration: item.slotDuration ?? 60,
         })),
       )
       .returning();
@@ -292,14 +295,37 @@ router.get(
   },
 );
 
+// ─── Slot generation helper ───────────────────────────────────────────────────
+function generateSlotPairs(
+  startTime: string,
+  endTime: string,
+  durationMinutes: number,
+): Array<{ startTime: string; endTime: string }> {
+  const [sh, sm] = startTime.split(":").map(Number) as [number, number];
+  const [eh, em] = endTime.split(":").map(Number) as [number, number];
+  const startMin = sh * 60 + sm;
+  const endMin   = eh * 60 + em;
+  const pairs: Array<{ startTime: string; endTime: string }> = [];
+  for (let t = startMin; t + durationMinutes <= endMin; t += durationMinutes) {
+    const s = t;
+    const e = t + durationMinutes;
+    pairs.push({
+      startTime: `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`,
+      endTime:   `${String(Math.floor(e / 60)).padStart(2, "0")}:${String(e % 60).padStart(2, "0")}`,
+    });
+  }
+  return pairs;
+}
+
 // ─── POST /api/barbers/me/slots/seed-week ─────────────────────────────────────
-// Fills empty days in the next 7 days with 13 standard hourly slots (10:00–23:00).
+// Fills empty days in the next 7 days using the barber's weekly availability template.
 //
 // Rules:
-//  - If a day already has ANY slots → leave it completely untouched.
-//  - If a day has NO slots → insert all 13 standard slots.
-//
-// This means intentionally deleted slots are never re-created.
+//  1. If a day already has ANY slots → skip (never overwrite manual edits).
+//  2. If barber has NO availability template at all → use default 13-slot schedule.
+//  3. If template exists for that day_of_week and is_open=true → generate slots from template.
+//  4. If template exists for that day_of_week and is_open=false → no slots (closed day).
+//  5. If template exists but has no entry for that day_of_week → no slots.
 router.post(
   "/me/slots/seed-week",
   authenticate,
@@ -316,6 +342,16 @@ router.post(
       return;
     }
 
+    // Load the barber's weekly availability template
+    const availRows = await db
+      .select()
+      .from(availabilityTable)
+      .where(eq(availabilityTable.barberId, barber.id));
+
+    const hasTemplate = availRows.length > 0;
+    // Map dayOfWeek → template row
+    const templateMap = new Map(availRows.map((r) => [r.dayOfWeek, r]));
+
     const today = new Date();
     const dates: string[] = [];
     for (let i = 0; i < 7; i++) {
@@ -324,14 +360,14 @@ router.post(
       dates.push(d.toISOString().split("T")[0]!);
     }
 
-    // Standard schedule: 10:00–11:00 … 22:00–23:00 (13 slots)
+    // Standard fallback schedule: 10:00–23:00 in 1-hour slots (13 slots)
     const DEFAULT_HOURS = Array.from({ length: 13 }, (_, i) => i + 10);
 
     let totalInserted = 0;
-    const summary: Record<string, { inserted: number; skipped: boolean }> = {};
+    const summary: Record<string, { inserted: number; skipped: boolean; closed?: boolean }> = {};
 
     for (const date of dates) {
-      // If day already has any slots — leave it completely untouched
+      // Skip days that already have slots — never overwrite
       const existing = await db
         .select({ id: appointmentSlotsTable.id })
         .from(appointmentSlotsTable)
@@ -349,48 +385,35 @@ router.post(
         continue;
       }
 
-      // Day is empty — try to use the same weekday from 7 days ago as template.
-      // This preserves intentional deletions: if barber removed 10:00 last Tuesday,
-      // next Tuesday also won't have 10:00.
-      const prevDate = new Date(date + "T12:00:00");
-      prevDate.setDate(prevDate.getDate() - 7);
-      const prevDateStr = prevDate.toISOString().split("T")[0]!;
-
-      const prevSlots = await db
-        .select({
-          startTime: appointmentSlotsTable.startTime,
-          endTime: appointmentSlotsTable.endTime,
-        })
-        .from(appointmentSlotsTable)
-        .where(
-          and(
-            eq(appointmentSlotsTable.barberId, barber.id),
-            eq(appointmentSlotsTable.date, prevDateStr),
-          ),
-        );
+      const dayOfWeek = new Date(date + "T12:00:00").getDay(); // 0=Sun…6=Sat
 
       let slotPairs: Array<{ startTime: string; endTime: string }>;
 
-      if (prevSlots.length > 0) {
-        // Copy last week's pattern (only the time pairs, not availability/booking state)
-        slotPairs = prevSlots.map((s) => ({
-          startTime: s.startTime,
-          endTime: s.endTime,
-        }));
-        req.log.info(
-          { barberId: barber.id, date, template: prevDateStr, count: slotPairs.length },
-          "seed-week: using previous week template",
-        );
-      } else {
-        // No previous week data — fall back to default 13 standard slots
+      if (!hasTemplate) {
+        // No template configured → use default 13-slot schedule
         slotPairs = DEFAULT_HOURS.map((hour) => ({
           startTime: `${String(hour).padStart(2, "0")}:00`,
           endTime:   `${String(hour + 1).padStart(2, "0")}:00`,
         }));
+        req.log.info({ barberId: barber.id, date, count: slotPairs.length }, "seed-week: no template, using default");
+      } else {
+        const tmpl = templateMap.get(dayOfWeek);
+        if (!tmpl || !tmpl.isOpen) {
+          // Day is closed in template → no slots
+          summary[date] = { inserted: 0, skipped: false, closed: true };
+          req.log.info({ barberId: barber.id, date, dayOfWeek }, "seed-week: day closed in template");
+          continue;
+        }
+        slotPairs = generateSlotPairs(tmpl.startTime, tmpl.endTime, tmpl.slotDuration);
         req.log.info(
-          { barberId: barber.id, date, count: slotPairs.length },
-          "seed-week: using default template",
+          { barberId: barber.id, date, dayOfWeek, count: slotPairs.length, template: tmpl },
+          "seed-week: using availability template",
         );
+      }
+
+      if (slotPairs.length === 0) {
+        summary[date] = { inserted: 0, skipped: false };
+        continue;
       }
 
       const toInsert = slotPairs.map((p) => ({

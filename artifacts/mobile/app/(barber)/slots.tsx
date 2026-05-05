@@ -27,6 +27,9 @@ import {
   useDeleteSlot,
   getGetBarberSlotsQueryKey,
   useGetMyBarberProfile,
+  useGetMyAvailability,
+  useSetMyAvailability,
+  getGetMyAvailabilityQueryKey,
 } from "@workspace/api-client-react";
 import type { SlotAppointmentDetail } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -251,6 +254,73 @@ export default function SlotsScreen() {
     },
   });
 
+  // ── Weekly template helpers ────────────────────────────────────────────────
+  const { data: availabilityData } = useGetMyAvailability();
+  const setAvailability = useSetMyAvailability({
+    mutation: {
+      onSuccess: () =>
+        queryClient.invalidateQueries({ queryKey: getGetMyAvailabilityQueryKey() }),
+      onError: (err: any) =>
+        Alert.alert("Hata", err?.data?.error ?? "Şablon güncellenemedi"),
+    },
+  });
+
+  // day_of_week for the currently selected date (0=Sun…6=Sat)
+  const selectedDayOfWeek = new Date(selectedDate + "T12:00:00").getDay();
+  const templateForDay = availabilityData?.find(
+    (a) => a.dayOfWeek === selectedDayOfWeek,
+  );
+  const templateHasDay = templateForDay !== undefined;
+  const templateDayOpen = templateForDay?.isOpen ?? true;
+
+  const handleToggleTemplateDay = () => {
+    if (!availabilityData) return;
+    const hasTemplate = availabilityData.length > 0;
+    const newIsOpen = !templateDayOpen;
+
+    const DEFAULT_ROW = {
+      dayOfWeek: selectedDayOfWeek,
+      isOpen: newIsOpen,
+      startTime: "10:00",
+      endTime: "22:00",
+      slotDuration: 60,
+    };
+
+    let updated: typeof availabilityData;
+
+    if (!hasTemplate) {
+      // First time using template — create all 7 days, toggle this one
+      updated = [0, 1, 2, 3, 4, 5, 6].map((d) => ({
+        dayOfWeek: d,
+        isOpen: d === selectedDayOfWeek ? newIsOpen : d >= 1 && d <= 6,
+        startTime: "10:00",
+        endTime: "22:00",
+        slotDuration: 60,
+        id: 0,
+        barberId: 0,
+      }));
+    } else if (!templateHasDay) {
+      updated = [
+        ...availabilityData,
+        { ...DEFAULT_ROW, id: 0, barberId: 0 },
+      ];
+    } else {
+      updated = availabilityData.map((a) =>
+        a.dayOfWeek === selectedDayOfWeek ? { ...a, isOpen: newIsOpen } : a,
+      );
+    }
+
+    setAvailability.mutate({
+      data: updated.map(({ dayOfWeek, isOpen, startTime, endTime, slotDuration }) => ({
+        dayOfWeek,
+        isOpen,
+        startTime,
+        endTime,
+        slotDuration,
+      })),
+    });
+  };
+
   const handleCreateSlot = () => {
     if (!startTime || !endTime) return;
     createSlot.mutate({
@@ -322,6 +392,45 @@ export default function SlotsScreen() {
           );
         })}
       </ScrollView>
+
+      {/* Weekly template banner */}
+      {availabilityData !== undefined && (
+        <TouchableOpacity
+          style={[styles.templateBanner, !templateDayOpen && styles.templateBannerClosed]}
+          onPress={() =>
+            Alert.alert(
+              templateDayOpen ? "Bu günü şablonda kapat?" : "Bu günü şablonda aç?",
+              templateDayOpen
+                ? "Bu haftanın gününü şablonda kapalı yaparsanız, gelecekte bu gün için otomatik slot oluşturulmaz."
+                : "Bu günü şablonda açarsanız, gelecekte bu gün için otomatik slot oluşturulur.",
+              [
+                { text: "İptal", style: "cancel" },
+                {
+                  text: templateDayOpen ? "Kapat" : "Aç",
+                  style: templateDayOpen ? "destructive" : "default",
+                  onPress: handleToggleTemplateDay,
+                },
+              ],
+            )
+          }
+          activeOpacity={0.8}
+          disabled={setAvailability.isPending}
+        >
+          <Feather
+            name={templateDayOpen ? "calendar" : "calendar"}
+            size={14}
+            color={templateDayOpen ? "#059669" : c.mutedForeground}
+          />
+          <Text style={[styles.templateBannerText, !templateDayOpen && styles.templateBannerTextClosed]}>
+            {setAvailability.isPending
+              ? "Kaydediliyor…"
+              : templateDayOpen
+              ? "Şablonda açık — haftalık program aktif"
+              : "Şablonda kapalı — bu gün otomatik oluşturulmaz"}
+          </Text>
+          <Feather name="chevron-right" size={14} color={templateDayOpen ? "#059669" : c.mutedForeground} />
+        </TouchableOpacity>
+      )}
 
       {/* Slots list */}
       {isLoading ? (
@@ -596,6 +705,26 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     backgroundColor: c.background,
   },
+
+  templateBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginHorizontal: 16,
+    marginBottom: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    backgroundColor: "#D1FAE5",
+    gap: 6,
+  },
+  templateBannerClosed: { backgroundColor: c.secondary },
+  templateBannerText: {
+    flex: 1,
+    fontSize: 12,
+    fontFamily: "Inter_500Medium",
+    color: "#059669",
+  },
+  templateBannerTextClosed: { color: c.mutedForeground },
 
   empty: { alignItems: "center", paddingVertical: 40, gap: 16 },
   emptyText: { fontSize: 15, fontFamily: "Inter_500Medium", color: c.mutedForeground },

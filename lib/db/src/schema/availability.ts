@@ -6,10 +6,11 @@ import { barbersTable } from "./barbers";
 export const availabilityTable = pgTable("availability", {
   id: serial("id").primaryKey(),
   barberId: integer("barber_id").notNull().references(() => barbersTable.id),
-  dayOfWeek: integer("day_of_week").notNull(), // 0=Sunday ... 6=Saturday
+  dayOfWeek: integer("day_of_week").notNull(), // 0=Sunday … 6=Saturday
   startTime: text("start_time").notNull(), // HH:MM
-  endTime: text("end_time").notNull(), // HH:MM
-  isActive: boolean("is_active").notNull().default(true),
+  endTime: text("end_time").notNull(),     // HH:MM
+  isOpen: boolean("is_open").notNull().default(true),
+  slotDuration: integer("slot_duration").notNull().default(60), // minutes
 });
 
 export const insertAvailabilitySchema = createInsertSchema(availabilityTable).omit({
