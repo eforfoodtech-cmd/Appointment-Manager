@@ -181,7 +181,7 @@ export default function SlotsScreen() {
         <FlatList
           data={slots ?? []}
           keyExtractor={(s) => String(s.id)}
-          contentContainerStyle={styles.slotList}
+          contentContainerStyle={[styles.slotList, { paddingBottom: insets.bottom + 90 }]}
           ListEmptyComponent={
             <View style={styles.empty}>
               <Feather name="clock" size={40} color={c.border} />
@@ -350,7 +350,7 @@ const styles = StyleSheet.create({
   dayMonth: { fontSize: 10, fontFamily: "Inter_400Regular", color: c.mutedForeground },
   dayMonthActive: { color: "rgba(255,255,255,0.7)" },
 
-  slotList: { paddingHorizontal: 16, paddingBottom: 40, gap: 8 },
+  slotList: { paddingHorizontal: 16, gap: 8 },
 
   slotRow: {
     flexDirection: "row",

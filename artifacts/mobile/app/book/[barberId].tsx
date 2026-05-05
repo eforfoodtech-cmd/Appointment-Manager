@@ -355,7 +355,7 @@ const styles = StyleSheet.create({
   dayDateActive: { color: "#fff" },
   dayMonth: { fontSize: 10, fontFamily: "Inter_400Regular", color: c.mutedForeground },
   dayMonthActive: { color: "rgba(255,255,255,0.7)" },
-  slotGrid: { paddingHorizontal: 16, gap: 8, paddingBottom: 20 },
+  slotGrid: { paddingHorizontal: 16, gap: 8, paddingBottom: 100 },
   slot: {
     flexDirection: "row",
     alignItems: "center",
