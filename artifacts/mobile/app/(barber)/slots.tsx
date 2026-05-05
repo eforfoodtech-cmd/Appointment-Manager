@@ -334,38 +334,40 @@ export default function SlotsScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Day selector */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.daysRow}
-        style={styles.daysScrollView}
-      >
-        {days.map((d) => {
-          const { day, date } = formatDay(d);
-          const isSelected = d === selectedDate;
-          return (
-            <TouchableOpacity
-              key={d}
-              style={[styles.dayBtn, isSelected && styles.dayBtnActive]}
-              onPress={() => setSelectedDate(d)}
-              activeOpacity={0.7}
-            >
-              <Text style={[styles.dayName, isSelected && styles.dayNameActive]}>{day}</Text>
-              <Text style={[styles.dayDate, isSelected && styles.dayDateActive]}>{date}</Text>
-            </TouchableOpacity>
-          );
-        })}
-      </ScrollView>
+      {/* Day selector — fixed-height wrapper so slot list always starts at same Y */}
+      <View style={styles.daysScrollWrapper}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.daysRow}
+        >
+          {days.map((d) => {
+            const { day, date } = formatDay(d);
+            const isSelected = d === selectedDate;
+            return (
+              <TouchableOpacity
+                key={d}
+                style={[styles.dayBtn, isSelected && styles.dayBtnActive]}
+                onPress={() => setSelectedDate(d)}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.dayName, isSelected && styles.dayNameActive]}>{day}</Text>
+                <Text style={[styles.dayDate, isSelected && styles.dayDateActive]}>{date}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+      </View>
 
-      {/* Slots list */}
+      {/* Slots list — flex:1 so both loading and data states fill same space */}
       {isLoading ? (
-        <View style={styles.empty}>
+        <View style={[styles.empty, { flex: 1 }]}>
           <ActivityIndicator color={c.primary} />
           <Text style={styles.emptyText}>Yükleniyor…</Text>
         </View>
       ) : (
         <FlatList
+          style={{ flex: 1 }}
           data={slots ?? []}
           keyExtractor={(s) => String(s.id)}
           contentContainerStyle={[styles.slotList, { paddingBottom: insets.bottom + 90 }]}
@@ -548,7 +550,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  daysScrollView: { height: 108, flexShrink: 0 },
+  daysScrollWrapper: { height: 108, flexShrink: 0, overflow: "hidden" },
   daysRow: { paddingHorizontal: 16, paddingBottom: 16, gap: 8 },
   dayBtn: {
     alignItems: "center",
