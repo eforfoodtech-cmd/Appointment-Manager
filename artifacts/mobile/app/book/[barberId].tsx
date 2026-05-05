@@ -81,7 +81,7 @@ export default function BookingScreen() {
         queryClient.invalidateQueries({ queryKey: ["getBarberSlots"] });
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         Alert.alert("Randevu Alındı", "Randevunuz başarıyla oluşturuldu!", [
-          { text: "Tamam", onPress: () => router.replace("/(customer)") },
+          { text: "Tamam", onPress: () => router.back() },
         ]);
       },
       onError: (err: any) => {
@@ -121,6 +121,15 @@ export default function BookingScreen() {
 
   return (
     <View style={[styles.container, { paddingBottom: insets.bottom + 20 }]}>
+      {/* Header with back button */}
+      <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
+        <TouchableOpacity style={styles.backBtn} onPress={() => router.back()} activeOpacity={0.7}>
+          <Feather name="arrow-left" size={22} color={c.foreground} />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Randevu Al</Text>
+        <View style={{ width: 38 }} />
+      </View>
+
       {/* Barber info */}
       <View style={styles.barberCard}>
         <View style={styles.avatar}>
@@ -247,6 +256,24 @@ export default function BookingScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: c.background },
   loading: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: c.background },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingBottom: 8,
+  },
+  backBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: c.card,
+    borderWidth: 1,
+    borderColor: c.border,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  headerTitle: { fontSize: 17, fontFamily: "Inter_600SemiBold", color: c.foreground },
   barberCard: {
     flexDirection: "row",
     alignItems: "center",

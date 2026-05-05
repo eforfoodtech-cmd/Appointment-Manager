@@ -11,7 +11,6 @@ import {
   StyleSheet,
   ActivityIndicator,
   Alert,
-  Platform,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLocalSearchParams, router } from "expo-router";
@@ -40,11 +39,7 @@ const STATUS_LABELS: Record<string, { label: string; color: string }> = {
 
 /** Navigate back reliably on both web and native. */
 function goBack() {
-  if (Platform.OS === "web") {
-    window.history.back();
-  } else {
-    router.back();
-  }
+  router.back();
 }
 
 export default function AppointmentDetail() {
@@ -181,6 +176,15 @@ export default function AppointmentDetail() {
       style={styles.scroll}
       contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}
     >
+      {/* Header with back button */}
+      <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
+        <TouchableOpacity style={styles.backBtn} onPress={goBack} activeOpacity={0.7}>
+          <Feather name="arrow-left" size={22} color={c.foreground} />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Randevu Detayı</Text>
+        <View style={{ width: 38 }} />
+      </View>
+
       {/* Mutation loading overlay */}
       {isMutating && (
         <View style={styles.mutatingBanner}>
@@ -313,6 +317,24 @@ function ActionBtn({
 const styles = StyleSheet.create({
   scroll:   { flex: 1, backgroundColor: c.background },
   loading:  { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: c.background },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingBottom: 8,
+  },
+  backBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: c.card,
+    borderWidth: 1,
+    borderColor: c.border,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  headerTitle: { fontSize: 17, fontFamily: "Inter_600SemiBold", color: c.foreground },
   mutatingBanner: {
     flexDirection: "row",
     alignItems: "center",
