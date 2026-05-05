@@ -551,7 +551,7 @@ const styles = StyleSheet.create({
   dayBtn: {
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 12,
+    height: 126,
     paddingHorizontal: 12,
     borderRadius: colors.radius,
     backgroundColor: c.background,
@@ -567,7 +567,7 @@ const styles = StyleSheet.create({
   dayBtnActive: { backgroundColor: c.primary, borderColor: c.primary },
   dayName: { fontSize: 11, fontFamily: "Inter_500Medium", color: c.mutedForeground },
   dayNameActive: { color: "rgba(255,255,255,0.78)" },
-  dayDate: { fontSize: 15, fontFamily: "Inter_700Bold", color: c.foreground, marginTop: 2 },
+  dayDate: { fontSize: 14, fontFamily: "Inter_700Bold", color: c.foreground, marginTop: 2 },
   dayDateActive: { color: "#fff" },
   slotList: { paddingHorizontal: 16, gap: 8 },
 
