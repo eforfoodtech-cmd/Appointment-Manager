@@ -293,8 +293,14 @@ router.get(
 );
 
 // ─── POST /api/barbers/me/slots/seed-week ─────────────────────────────────────
-// Normalises the next 7 days: removes all UN-BOOKED slots, then inserts 13
-// clean hourly slots (10:00–23:00) per day.  Booked slots are never touched.
+// Normalises the next 7 days to exactly 13 standard hourly slots (10:00–23:00).
+//
+// Rules:
+//  1. Never touch slots that have ANY appointment linked (any status).
+//  2. Delete only slots with no appointment reference (removes duplicates / stale data).
+//  3. After cleanup, insert only the standard slots that don't already exist
+//     (same barber + date + startTime) — prevents duplicates.
+//  4. Logs deleted and inserted counts per date.
 router.post(
   "/me/slots/seed-week",
   authenticate,
@@ -319,34 +325,65 @@ router.post(
       dates.push(d.toISOString().split("T")[0]!);
     }
 
-    // 13 hourly slots: 10:00–11:00 … 22:00–23:00
+    // Standard schedule: 10:00–11:00 … 22:00–23:00 (13 slots)
     const DEFAULT_HOURS = Array.from({ length: 13 }, (_, i) => i + 10);
 
+    let totalDeleted = 0;
+    let totalInserted = 0;
+    const summary: Record<string, { deleted: number; inserted: number }> = {};
+
     for (const date of dates) {
-      // Delete slots that have NO appointment references (safe even with FK constraint).
-      // This removes duplicates and old custom slots while keeping any slot
-      // that a cancelled/no-show/completed appointment still points to.
-      await db.execute(
+      // ── Step 1: delete appointment-free slots ────────────────────────────────
+      // Only removes slots that have NO appointment row referencing them at all.
+      // Slots tied to any appointment (booked, cancelled, no-show, etc.) are kept.
+      const deleteResult = await db.execute(
         sql`DELETE FROM appointment_slots
             WHERE barber_id = ${barber.id}
-              AND date = ${date}
-              AND id NOT IN (SELECT slot_id FROM appointments)`,
+              AND date       = ${date}
+              AND id NOT IN (SELECT slot_id FROM appointments)
+            RETURNING id`,
       );
+      const deleted = (deleteResult.rows ?? []).length;
+      totalDeleted += deleted;
 
-      // Insert 13 clean hourly slots
-      await db.insert(appointmentSlotsTable).values(
-        DEFAULT_HOURS.map((hour) => ({
+      // ── Step 2: find which standard start-times already exist ────────────────
+      // (could be appointment-linked slots that survived the delete above)
+      const surviving = await db
+        .select({ startTime: appointmentSlotsTable.startTime })
+        .from(appointmentSlotsTable)
+        .where(
+          and(
+            eq(appointmentSlotsTable.barberId, barber.id),
+            eq(appointmentSlotsTable.date, date),
+          ),
+        );
+      const existingTimes = new Set(surviving.map((s) => s.startTime));
+
+      // ── Step 3: insert only missing standard slots ───────────────────────────
+      const toInsert = DEFAULT_HOURS
+        .map((hour) => ({
           barberId: barber.id,
           date,
           startTime: `${String(hour).padStart(2, "0")}:00`,
-          endTime: `${String(hour + 1).padStart(2, "0")}:00`,
+          endTime:   `${String(hour + 1).padStart(2, "0")}:00`,
           isAvailable: true,
-          isBooked: false,
-        })),
-      );
+          isBooked:    false,
+        }))
+        .filter((s) => !existingTimes.has(s.startTime));
+
+      let inserted = 0;
+      if (toInsert.length > 0) {
+        await db.insert(appointmentSlotsTable).values(toInsert);
+        inserted = toInsert.length;
+      }
+      totalInserted += inserted;
+
+      summary[date] = { deleted, inserted };
+      req.log.info({ barberId: barber.id, date, deleted, inserted }, "seed-week: date normalised");
     }
 
-    res.json({ ok: true, dates });
+    req.log.info({ barberId: barber.id, totalDeleted, totalInserted }, "seed-week: completed");
+    res.json({ ok: true, totalDeleted, totalInserted, summary });
   },
 );
 
