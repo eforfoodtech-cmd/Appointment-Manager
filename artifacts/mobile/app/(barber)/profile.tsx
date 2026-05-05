@@ -61,23 +61,20 @@ export default function BarberProfile() {
     },
   });
 
-  const removeBlock = useRemoveBlock({
-    mutation: {
-      onSuccess: (_data, variables) => {
-        // Optimistic update: remove the block from cache immediately
-        queryClient.setQueryData(
-          getListBlocksQueryKey(),
-          (old: any[] | undefined) =>
-            old?.filter((b) => b.id !== variables.blockId) ?? [],
-        );
-        // Also force a refetch so data stays consistent
-        queryClient.refetchQueries({ queryKey: getListBlocksQueryKey() });
-      },
-      onError: (err: any) => {
-        Alert.alert("Hata", err?.data?.error || "Engel kaldırılamadı");
-      },
-    },
-  });
+  const removeBlock = useRemoveBlock();
+
+  const handleRemoveBlock = async (blockId: number) => {
+    try {
+      await removeBlock.mutateAsync({ blockId });
+      queryClient.setQueryData(
+        getListBlocksQueryKey(),
+        (old: any[] | undefined) => old?.filter((b) => b.id !== blockId) ?? [],
+      );
+      await queryClient.refetchQueries({ queryKey: getListBlocksQueryKey() });
+    } catch (err: any) {
+      Alert.alert("Hata", err?.data?.error || "Engel kaldırılamadı");
+    }
+  };
 
   const handleSave = () => {
     if (!shopName.trim()) {
@@ -180,16 +177,16 @@ export default function BarberProfile() {
                 )}
               </View>
               <TouchableOpacity
-                onPress={() =>
+                onPress={() => {
                   Alert.alert("Engeli Kaldır", "Bu müşterinin engelini kaldırmak ister misiniz?", [
                     { text: "İptal", style: "cancel" },
                     {
                       text: "Kaldır",
                       style: "destructive",
-                      onPress: () => removeBlock.mutate({ blockId: block.id }),
+                      onPress: () => handleRemoveBlock(block.id),
                     },
-                  ])
-                }
+                  ]);
+                }}
               >
                 <Feather name="x-circle" size={22} color={c.destructive} />
               </TouchableOpacity>
