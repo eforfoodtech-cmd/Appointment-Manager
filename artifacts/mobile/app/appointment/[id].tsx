@@ -1,5 +1,6 @@
 /**
  * Appointment detail — shows full info with status management.
+ * After any status mutation: invalidates relevant queries and navigates back.
  */
 import React from "react";
 import {
@@ -10,6 +11,7 @@ import {
   StyleSheet,
   ActivityIndicator,
   Alert,
+  Platform,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLocalSearchParams, router } from "expo-router";
@@ -18,6 +20,9 @@ import {
   useGetAppointment,
   useUpdateAppointment,
   useCreateBlock,
+  getListAppointmentsQueryKey,
+  getGetBarberDashboardQueryKey,
+  getGetUpcomingAppointmentsQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/context/AuthContext";
@@ -26,27 +31,50 @@ import colors from "@/constants/colors";
 const c = colors.light;
 
 const STATUS_LABELS: Record<string, { label: string; color: string }> = {
-  pending: { label: "Bekliyor", color: "#F59E0B" },
-  confirmed: { label: "Onaylandı", color: "#10B981" },
-  cancelled: { label: "İptal", color: "#EF4444" },
-  completed: { label: "Tamamlandı", color: "#6366F1" },
-  no_show: { label: "Gelmedi", color: "#EF4444" },
+  pending:   { label: "Bekliyor",    color: "#F59E0B" },
+  confirmed: { label: "Onaylandı",   color: "#10B981" },
+  cancelled: { label: "İptal",       color: "#EF4444" },
+  completed: { label: "Tamamlandı",  color: "#6366F1" },
+  no_show:   { label: "Gelmedi",     color: "#EF4444" },
 };
+
+/** Navigate back reliably on both web and native. */
+function goBack() {
+  if (Platform.OS === "web") {
+    window.history.back();
+  } else {
+    router.back();
+  }
+}
 
 export default function AppointmentDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const apptId = Number(id);
 
-  const { data: appt, isLoading } = useGetAppointment(Number(id));
+  const { data: appt, isLoading } = useGetAppointment(apptId);
+
+  /** Invalidate every query that shows appointment data. */
+  const invalidateAll = () => {
+    // Prefix-based: catches all param variants
+    queryClient.invalidateQueries({ queryKey: ["/api/appointments"] });
+    queryClient.invalidateQueries({ queryKey: getListAppointmentsQueryKey() });
+    queryClient.invalidateQueries({ queryKey: getGetBarberDashboardQueryKey() });
+    queryClient.invalidateQueries({ queryKey: getGetUpcomingAppointmentsQueryKey() });
+    // Remove the single-appointment cache entry so stale data doesn't flash
+    queryClient.removeQueries({ queryKey: [`/api/appointments/${apptId}`] });
+  };
 
   const update = useUpdateAppointment({
     mutation: {
       onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: ["getAppointment"] });
-        queryClient.invalidateQueries({ queryKey: ["barber-dashboard"] });
-        queryClient.invalidateQueries({ queryKey: ["getUpcomingAppointments"] });
+        invalidateAll();
+        goBack();
+      },
+      onError: (err: any) => {
+        Alert.alert("Hata", err?.data?.error || "İşlem başarısız oldu");
       },
     },
   });
@@ -54,33 +82,44 @@ export default function AppointmentDetail() {
   const createBlock = useCreateBlock({
     mutation: {
       onSuccess: () => {
-        Alert.alert("Başarılı", "Müşteri engellendi");
-        queryClient.invalidateQueries({ queryKey: ["listBlocks"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/barbers/me/blocks"] });
+        // After blocking, also go back so the screen doesn't freeze
+        goBack();
       },
       onError: (err: any) => Alert.alert("Hata", err?.data?.error || "Engellenemedi"),
     },
   });
 
-  const handleCancel = () => {
-    Alert.alert("İptal Et", "Randevuyu iptal etmek istiyor musunuz?", [
-      { text: "Geri", style: "cancel" },
-      {
-        text: "İptal Et",
-        style: "destructive",
-        onPress: () =>
-          update.mutate({ appointmentId: Number(id), data: { status: "cancelled" } }),
-      },
-    ]);
-  };
+  const isMutating = update.isPending || createBlock.isPending;
 
-  const handleNoShow = () => {
-    Alert.alert("No-Show", "Müşteri gelmedi olarak işaretlensin mi?", [
+  const handleStatusChange = (status: "cancelled" | "no_show" | "completed") => {
+    const labels: Record<string, { title: string; msg: string; btn: string }> = {
+      cancelled: {
+        title: "Randevuyu İptal Et",
+        msg: "Bu randevuyu iptal etmek istiyor musunuz?",
+        btn: "İptal Et",
+      },
+      no_show: {
+        title: "Gelmedi İşareti",
+        msg: "Müşteri gelmedi olarak işaretlensin mi?",
+        btn: "İşaretle",
+      },
+      completed: {
+        title: "Tamamlandı",
+        msg: "Randevuyu tamamlandı olarak işaretleyelim mi?",
+        btn: "Tamamlandı",
+      },
+    };
+
+    const { title, msg, btn } = labels[status];
+
+    Alert.alert(title, msg, [
       { text: "Geri", style: "cancel" },
       {
-        text: "İşaretle",
-        style: "destructive",
+        text: btn,
+        style: status === "completed" ? "default" : "destructive",
         onPress: () =>
-          update.mutate({ appointmentId: Number(id), data: { status: "no_show" } }),
+          update.mutate({ appointmentId: apptId, data: { status } }),
       },
     ]);
   };
@@ -88,7 +127,7 @@ export default function AppointmentDetail() {
   const handleBlock = () => {
     Alert.alert(
       "Müşteriyi Engelle",
-      "Bu müşteri artık randevu alamayacak. Ne kadar süreyle engellemek istiyorsunuz?",
+      "Bu müşteri artık randevu alamayacak. Süreyi seçin:",
       [
         { text: "İptal", style: "cancel" },
         {
@@ -142,6 +181,14 @@ export default function AppointmentDetail() {
       style={styles.scroll}
       contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}
     >
+      {/* Mutation loading overlay */}
+      {isMutating && (
+        <View style={styles.mutatingBanner}>
+          <ActivityIndicator size="small" color={c.primary} />
+          <Text style={styles.mutatingText}>İşleniyor…</Text>
+        </View>
+      )}
+
       {/* Status badge */}
       <View style={[styles.statusBanner, { backgroundColor: statusInfo.color + "20" }]}>
         <View style={[styles.statusDot, { backgroundColor: statusInfo.color }]} />
@@ -169,9 +216,11 @@ export default function AppointmentDetail() {
 
       {/* Info rows */}
       <View style={styles.infoCard}>
-        <InfoRow icon="scissors" label="Berber" value={`${appt.barberName} — ${appt.shopName}`} />
-        <InfoRow icon="user" label="Müşteri" value={appt.customerName} />
-        {appt.customerPhone && <InfoRow icon="phone" label="Telefon" value={appt.customerPhone} />}
+        <InfoRow icon="scissors" label="Berber"   value={`${appt.barberName} — ${appt.shopName}`} />
+        <InfoRow icon="user"     label="Müşteri"  value={appt.customerName} />
+        {appt.customerPhone && (
+          <InfoRow icon="phone" label="Telefon" value={appt.customerPhone} />
+        )}
         {appt.notes && <InfoRow icon="file-text" label="Not" value={appt.notes} />}
         <InfoRow
           icon="clock"
@@ -181,7 +230,7 @@ export default function AppointmentDetail() {
       </View>
 
       {/* Actions */}
-      {isActive && (
+      {isActive && !isMutating && (
         <View style={styles.actions}>
           {isBarber ? (
             <>
@@ -189,24 +238,19 @@ export default function AppointmentDetail() {
                 icon="check-circle"
                 label="Tamamlandı"
                 color={c.success}
-                onPress={() =>
-                  update.mutate({
-                    appointmentId: Number(id),
-                    data: { status: "completed" },
-                  })
-                }
+                onPress={() => handleStatusChange("completed")}
               />
               <ActionBtn
                 icon="user-x"
                 label="Gelmedi"
                 color={c.warning}
-                onPress={handleNoShow}
+                onPress={() => handleStatusChange("no_show")}
               />
               <ActionBtn
                 icon="x-circle"
                 label="İptal Et"
                 color={c.destructive}
-                onPress={handleCancel}
+                onPress={() => handleStatusChange("cancelled")}
               />
             </>
           ) : (
@@ -214,14 +258,14 @@ export default function AppointmentDetail() {
               icon="x-circle"
               label="İptal Et"
               color={c.destructive}
-              onPress={handleCancel}
+              onPress={() => handleStatusChange("cancelled")}
             />
           )}
         </View>
       )}
 
-      {/* Barber: block after no-show */}
-      {isBarber && appt.status === "no_show" && (
+      {/* Barber: block option after no-show */}
+      {isBarber && appt.status === "no_show" && !isMutating && (
         <TouchableOpacity style={styles.blockBtn} onPress={handleBlock} activeOpacity={0.8}>
           <Feather name="shield" size={18} color={c.destructive} />
           <Text style={styles.blockText}>Müşteriyi Engelle</Text>
@@ -267,8 +311,20 @@ function ActionBtn({
 }
 
 const styles = StyleSheet.create({
-  scroll: { flex: 1, backgroundColor: c.background },
-  loading: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: c.background },
+  scroll:   { flex: 1, backgroundColor: c.background },
+  loading:  { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: c.background },
+  mutatingBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    marginHorizontal: 16,
+    marginTop: 16,
+    padding: 12,
+    borderRadius: colors.radius,
+    backgroundColor: c.primary + "15",
+  },
+  mutatingText: { fontSize: 14, fontFamily: "Inter_500Medium", color: c.primary },
   statusBanner: {
     flexDirection: "row",
     alignItems: "center",
@@ -278,7 +334,7 @@ const styles = StyleSheet.create({
     padding: 14,
     borderRadius: colors.radius,
   },
-  statusDot: { width: 10, height: 10, borderRadius: 5 },
+  statusDot:  { width: 10, height: 10, borderRadius: 5 },
   statusText: { fontSize: 16, fontFamily: "Inter_700Bold" },
   timeCard: {
     flexDirection: "row",
@@ -292,7 +348,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: c.border,
   },
-  timeDate: { fontSize: 16, fontFamily: "Inter_600SemiBold", color: c.foreground },
+  timeDate:  { fontSize: 16, fontFamily: "Inter_600SemiBold", color: c.foreground },
   timeRange: { fontSize: 22, fontFamily: "Inter_700Bold", color: c.primary, marginTop: 2 },
   infoCard: {
     marginHorizontal: 16,
