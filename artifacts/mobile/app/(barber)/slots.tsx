@@ -339,6 +339,7 @@ export default function SlotsScreen() {
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.daysRow}
+        style={styles.daysScrollView}
       >
         {days.map((d) => {
           const { day, date } = formatDay(d);
@@ -547,6 +548,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
+  daysScrollView: { height: 108, flexShrink: 0 },
   daysRow: { paddingHorizontal: 16, paddingBottom: 16, gap: 8 },
   dayBtn: {
     alignItems: "center",
@@ -571,7 +573,7 @@ const styles = StyleSheet.create({
   dayNameActive: { color: "rgba(255,255,255,0.78)" },
   dayDate: { fontSize: 12, fontFamily: "Inter_700Bold", color: c.foreground, marginTop: 0 },
   dayDateActive: { color: "#fff" },
-  slotList: { paddingHorizontal: 16, paddingTop: 8, gap: 8 },
+  slotList: { paddingHorizontal: 16, paddingTop: 4, gap: 8 },
 
   slotRow: {
     flexDirection: "row",
@@ -664,7 +666,7 @@ const styles = StyleSheet.create({
   },
   templateBannerTextClosed: { color: c.mutedForeground },
 
-  empty: { alignItems: "center", paddingVertical: 40, paddingTop: 8, gap: 16 },
+  empty: { alignItems: "center", paddingVertical: 40, gap: 16 },
   emptyText: { fontSize: 15, fontFamily: "Inter_500Medium", color: c.mutedForeground },
 
   modalOverlay: {
