@@ -341,7 +341,7 @@ export default function SlotsScreen() {
         contentContainerStyle={styles.daysRow}
       >
         {days.map((d) => {
-          const { day, date, month } = formatDay(d);
+          const { day, date } = formatDay(d);
           const isSelected = d === selectedDate;
           return (
             <TouchableOpacity
@@ -352,7 +352,6 @@ export default function SlotsScreen() {
             >
               <Text style={[styles.dayName, isSelected && styles.dayNameActive]}>{day}</Text>
               <Text style={[styles.dayDate, isSelected && styles.dayDateActive]}>{date}</Text>
-              <Text style={[styles.dayMonth, isSelected && styles.dayMonthActive]}>{month}</Text>
             </TouchableOpacity>
           );
         })}
@@ -564,9 +563,6 @@ const styles = StyleSheet.create({
   dayNameActive: { color: "rgba(255,255,255,0.8)" },
   dayDate: { fontSize: 18, fontFamily: "Inter_700Bold", color: c.foreground },
   dayDateActive: { color: "#fff" },
-  dayMonth: { fontSize: 10, fontFamily: "Inter_400Regular", color: c.mutedForeground },
-  dayMonthActive: { color: "rgba(255,255,255,0.7)" },
-
   slotList: { paddingHorizontal: 16, gap: 8 },
 
   slotRow: {
