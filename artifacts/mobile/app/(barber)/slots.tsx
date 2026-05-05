@@ -587,13 +587,13 @@ const styles = StyleSheet.create({
   slotRowBooked: { backgroundColor: c.primary + "18", borderColor: c.primary + "60" },
   slotRowClosed: { backgroundColor: c.secondary, opacity: 0.75 },
 
-  slotTimeCol: { width: 56 },
+  slotTimeCol: { width: 56, flexShrink: 0 },
   slotTime: { fontSize: 15, fontFamily: "Inter_700Bold", color: c.foreground },
   slotEndTime: { fontSize: 12, fontFamily: "Inter_400Regular", color: c.mutedForeground, marginTop: 1 },
   slotTimeBooked: { color: c.primary },
   slotTimeClosed: { color: c.mutedForeground },
 
-  bookedInfo: { flex: 1, flexDirection: "row", alignItems: "center", gap: 8 },
+  bookedInfo: { flex: 1, minWidth: 0, flexDirection: "row", alignItems: "center", gap: 8 },
   customerName: {
     flex: 1,
     fontSize: 13,
@@ -603,6 +603,7 @@ const styles = StyleSheet.create({
 
   badgeOpen: {
     flex: 1,
+    minWidth: 0,
     backgroundColor: "#D1FAE5",
     borderRadius: 6,
     paddingVertical: 4,
@@ -620,6 +621,7 @@ const styles = StyleSheet.create({
   badgeBookedText: { fontSize: 12, fontFamily: "Inter_600SemiBold", color: c.primary },
   badgeClosed: {
     flex: 1,
+    minWidth: 0,
     backgroundColor: c.secondary,
     borderRadius: 6,
     paddingVertical: 4,
@@ -628,7 +630,7 @@ const styles = StyleSheet.create({
   },
   badgeClosedText: { fontSize: 12, fontFamily: "Inter_600SemiBold", color: c.mutedForeground },
 
-  slotActions: { flexDirection: "row", gap: 4 },
+  slotActions: { flexDirection: "row", gap: 4, flexShrink: 0 },
   iconBtn: {
     width: 36,
     height: 36,
