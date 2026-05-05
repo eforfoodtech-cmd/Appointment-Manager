@@ -3,20 +3,32 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Tıraş - Barber Appointment SaaS API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: auth
+    description: Authentication operations
+  - name: barbers
+    description: Barber management
+  - name: availability
+    description: Barber availability and slots
+  - name: appointments
+    description: Appointment management
+  - name: customers
+    description: Customer management
+  - name: messages
+    description: Messaging
+
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,7 +36,551 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  # Auth
+  /auth/register:
+    post:
+      operationId: register
+      tags: [auth]
+      summary: Register a new user (barber or customer)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterRequest"
+      responses:
+        "201":
+          description: User registered
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Email already exists
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/login:
+    post:
+      operationId: login
+      tags: [auth]
+      summary: Login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Logged in
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/me:
+    get:
+      operationId: getMe
+      tags: [auth]
+      summary: Get current user
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  # Barbers
+  /barbers:
+    get:
+      operationId: listBarbers
+      tags: [barbers]
+      summary: List all active barbers
+      responses:
+        "200":
+          description: List of barbers
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Barber"
+
+  /barbers/{barberId}:
+    get:
+      operationId: getBarber
+      tags: [barbers]
+      summary: Get barber details
+      parameters:
+        - name: barberId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Barber details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Barber"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /barbers/me:
+    get:
+      operationId: getMyBarberProfile
+      tags: [barbers]
+      summary: Get current barber's profile
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Barber profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Barber"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    put:
+      operationId: updateMyBarberProfile
+      tags: [barbers]
+      summary: Update current barber's profile
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateBarberRequest"
+      responses:
+        "200":
+          description: Updated barber
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Barber"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  # Availability
+  /barbers/me/availability:
+    get:
+      operationId: getMyAvailability
+      tags: [availability]
+      summary: Get current barber's weekly availability
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Availability list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Availability"
+    put:
+      operationId: setMyAvailability
+      tags: [availability]
+      summary: Set current barber's weekly availability
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: "#/components/schemas/AvailabilityInput"
+      responses:
+        "200":
+          description: Updated availability
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Availability"
+
+  /barbers/{barberId}/slots:
+    get:
+      operationId: getBarberSlots
+      tags: [availability]
+      summary: Get available appointment slots for a barber on a date
+      parameters:
+        - name: barberId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: date
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+            description: Date in YYYY-MM-DD format
+      responses:
+        "200":
+          description: List of slots
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AppointmentSlot"
+
+  /barbers/me/slots:
+    post:
+      operationId: createSlot
+      tags: [availability]
+      summary: Barber creates an appointment slot
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSlotRequest"
+      responses:
+        "201":
+          description: Slot created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AppointmentSlot"
+
+  /barbers/me/slots/{slotId}:
+    patch:
+      operationId: updateSlot
+      tags: [availability]
+      summary: Open or close a slot
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: slotId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateSlotRequest"
+      responses:
+        "200":
+          description: Updated slot
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AppointmentSlot"
+    delete:
+      operationId: deleteSlot
+      tags: [availability]
+      summary: Delete a slot
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: slotId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  # Appointments
+  /appointments:
+    get:
+      operationId: listAppointments
+      tags: [appointments]
+      summary: List appointments (barber sees their daily, customer sees their own)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: date
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+        - name: status
+          in: query
+          required: false
+          schema:
+            $ref: "#/components/schemas/AppointmentStatus"
+      responses:
+        "200":
+          description: Appointment list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Appointment"
+    post:
+      operationId: createAppointment
+      tags: [appointments]
+      summary: Book an appointment (customer or barber on behalf)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateAppointmentRequest"
+      responses:
+        "201":
+          description: Appointment booked
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Appointment"
+        "400":
+          description: Slot unavailable or customer blocked
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /appointments/{appointmentId}:
+    get:
+      operationId: getAppointment
+      tags: [appointments]
+      summary: Get appointment details
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: appointmentId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Appointment details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Appointment"
+    patch:
+      operationId: updateAppointment
+      tags: [appointments]
+      summary: Update appointment status or reschedule
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: appointmentId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateAppointmentRequest"
+      responses:
+        "200":
+          description: Updated appointment
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Appointment"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  # No-show blocks
+  /barbers/me/blocks:
+    get:
+      operationId: listBlocks
+      tags: [customers]
+      summary: List no-show blocks set by this barber
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Block list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/NoShowBlock"
+    post:
+      operationId: createBlock
+      tags: [customers]
+      summary: Block a customer from booking
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateBlockRequest"
+      responses:
+        "201":
+          description: Block created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NoShowBlock"
+
+  /barbers/me/blocks/{blockId}:
+    delete:
+      operationId: removeBlock
+      tags: [customers]
+      summary: Remove a customer block
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: blockId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Block removed
+
+  # Messages
+  /messages:
+    get:
+      operationId: listMessages
+      tags: [messages]
+      summary: List messages for current user
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Message list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Message"
+    post:
+      operationId: sendMessage
+      tags: [messages]
+      summary: Send a message (barber to one or multiple customers)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SendMessageRequest"
+      responses:
+        "201":
+          description: Message sent
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Message"
+
+  # Dashboard summary (wow endpoint)
+  /barbers/me/dashboard:
+    get:
+      operationId: getBarberDashboard
+      tags: [barbers]
+      summary: Get barber dashboard summary
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: date
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+      responses:
+        "200":
+          description: Dashboard summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BarberDashboard"
+
+  /customers/me/upcoming:
+    get:
+      operationId: getUpcomingAppointments
+      tags: [customers]
+      summary: Get customer's upcoming appointments
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Upcoming appointments
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Appointment"
+
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
   schemas:
     HealthStatus:
       type: object
@@ -34,3 +590,421 @@ components:
       required:
         - status
 
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+      required:
+        - error
+
+    RegisterRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 6
+        name:
+          type: string
+        phone:
+          type: string
+        role:
+          type: string
+          enum: [barber, customer]
+        shopName:
+          type: string
+          description: Required if role is barber
+        shopAddress:
+          type: string
+      required:
+        - email
+        - password
+        - name
+        - role
+
+    LoginRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+      required:
+        - email
+        - password
+
+    AuthResponse:
+      type: object
+      properties:
+        token:
+          type: string
+        user:
+          $ref: "#/components/schemas/User"
+      required:
+        - token
+        - user
+
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+        email:
+          type: string
+        name:
+          type: string
+        phone:
+          type: string
+          nullable: true
+        role:
+          type: string
+          enum: [barber, customer]
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - email
+        - name
+        - role
+        - createdAt
+
+    Barber:
+      type: object
+      properties:
+        id:
+          type: integer
+        userId:
+          type: integer
+        shopName:
+          type: string
+        shopAddress:
+          type: string
+          nullable: true
+        phone:
+          type: string
+          nullable: true
+        bio:
+          type: string
+          nullable: true
+        isActive:
+          type: boolean
+        name:
+          type: string
+        email:
+          type: string
+      required:
+        - id
+        - userId
+        - shopName
+        - isActive
+        - name
+        - email
+
+    UpdateBarberRequest:
+      type: object
+      properties:
+        shopName:
+          type: string
+        shopAddress:
+          type: string
+        phone:
+          type: string
+        bio:
+          type: string
+
+    Availability:
+      type: object
+      properties:
+        id:
+          type: integer
+        barberId:
+          type: integer
+        dayOfWeek:
+          type: integer
+          minimum: 0
+          maximum: 6
+          description: 0=Sunday, 1=Monday, ..., 6=Saturday
+        startTime:
+          type: string
+          description: HH:MM format
+        endTime:
+          type: string
+          description: HH:MM format
+        isActive:
+          type: boolean
+      required:
+        - id
+        - barberId
+        - dayOfWeek
+        - startTime
+        - endTime
+        - isActive
+
+    AvailabilityInput:
+      type: object
+      properties:
+        dayOfWeek:
+          type: integer
+          minimum: 0
+          maximum: 6
+        startTime:
+          type: string
+        endTime:
+          type: string
+        isActive:
+          type: boolean
+      required:
+        - dayOfWeek
+        - startTime
+        - endTime
+        - isActive
+
+    AppointmentSlot:
+      type: object
+      properties:
+        id:
+          type: integer
+        barberId:
+          type: integer
+        date:
+          type: string
+          format: date
+        startTime:
+          type: string
+          description: HH:MM format
+        endTime:
+          type: string
+          description: HH:MM format
+        isAvailable:
+          type: boolean
+        isBooked:
+          type: boolean
+      required:
+        - id
+        - barberId
+        - date
+        - startTime
+        - endTime
+        - isAvailable
+        - isBooked
+
+    CreateSlotRequest:
+      type: object
+      properties:
+        date:
+          type: string
+          format: date
+        startTime:
+          type: string
+        endTime:
+          type: string
+        isAvailable:
+          type: boolean
+      required:
+        - date
+        - startTime
+        - endTime
+
+    UpdateSlotRequest:
+      type: object
+      properties:
+        isAvailable:
+          type: boolean
+
+    AppointmentStatus:
+      type: string
+      enum: [pending, confirmed, cancelled, completed, no_show]
+
+    Appointment:
+      type: object
+      properties:
+        id:
+          type: integer
+        slotId:
+          type: integer
+        barberId:
+          type: integer
+        customerId:
+          type: integer
+        status:
+          $ref: "#/components/schemas/AppointmentStatus"
+        notes:
+          type: string
+          nullable: true
+        date:
+          type: string
+          format: date
+        startTime:
+          type: string
+        endTime:
+          type: string
+        barberName:
+          type: string
+        shopName:
+          type: string
+        customerName:
+          type: string
+        customerPhone:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - slotId
+        - barberId
+        - customerId
+        - status
+        - date
+        - startTime
+        - endTime
+        - barberName
+        - shopName
+        - customerName
+        - createdAt
+
+    CreateAppointmentRequest:
+      type: object
+      properties:
+        slotId:
+          type: integer
+        notes:
+          type: string
+        customerId:
+          type: integer
+          description: Optional — barber can specify a customer when booking manually
+      required:
+        - slotId
+
+    UpdateAppointmentRequest:
+      type: object
+      properties:
+        status:
+          $ref: "#/components/schemas/AppointmentStatus"
+        slotId:
+          type: integer
+          description: New slot ID for rescheduling
+        notes:
+          type: string
+
+    NoShowBlock:
+      type: object
+      properties:
+        id:
+          type: integer
+        barberId:
+          type: integer
+        customerId:
+          type: integer
+        reason:
+          type: string
+          nullable: true
+        expiresAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        customerName:
+          type: string
+        customerPhone:
+          type: string
+          nullable: true
+      required:
+        - id
+        - barberId
+        - customerId
+        - createdAt
+        - customerName
+
+    CreateBlockRequest:
+      type: object
+      properties:
+        customerId:
+          type: integer
+        reason:
+          type: string
+        expiresAt:
+          type: string
+          format: date-time
+          description: Optional expiry. Omit for permanent block.
+      required:
+        - customerId
+
+    Message:
+      type: object
+      properties:
+        id:
+          type: integer
+        senderId:
+          type: integer
+        receiverId:
+          type: integer
+        content:
+          type: string
+        isRead:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        senderName:
+          type: string
+        receiverName:
+          type: string
+      required:
+        - id
+        - senderId
+        - receiverId
+        - content
+        - isRead
+        - createdAt
+        - senderName
+        - receiverName
+
+    SendMessageRequest:
+      type: object
+      properties:
+        receiverIds:
+          type: array
+          items:
+            type: integer
+          description: One or multiple customer IDs
+        content:
+          type: string
+      required:
+        - receiverIds
+        - content
+
+    BarberDashboard:
+      type: object
+      properties:
+        todayCount:
+          type: integer
+        pendingCount:
+          type: integer
+        completedCount:
+          type: integer
+        noShowCount:
+          type: integer
+        todayAppointments:
+          type: array
+          items:
+            $ref: "#/components/schemas/Appointment"
+        nextAppointment:
+          $ref: "#/components/schemas/Appointment"
+          nullable: true
+      required:
+        - todayCount
+        - pendingCount
+        - completedCount
+        - noShowCount
+        - todayAppointments
