@@ -22,6 +22,7 @@ import {
   useListBlocks,
   useRemoveBlock,
   getGetMyBarberProfileQueryKey,
+  getListBlocksQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/context/AuthContext";
@@ -62,7 +63,12 @@ export default function BarberProfile() {
 
   const removeBlock = useRemoveBlock({
     mutation: {
-      onSuccess: () => queryClient.invalidateQueries({ queryKey: ["listBlocks"] }),
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getListBlocksQueryKey() });
+      },
+      onError: (err: any) => {
+        Alert.alert("Hata", err?.data?.error || "Engel kaldırılamadı");
+      },
     },
   });
 
