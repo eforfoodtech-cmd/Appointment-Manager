@@ -40,52 +40,48 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Load stored auth on mount
     const loadAuth = async () => {
       try {
         const [storedToken, storedUser] = await Promise.all([
           AsyncStorage.getItem(TOKEN_KEY),
           AsyncStorage.getItem(USER_KEY),
         ]);
-
         if (storedToken && storedUser) {
           setToken(storedToken);
           setUser(JSON.parse(storedUser));
         }
       } catch {
-        // Ignore storage errors
+        // ignore storage errors
       } finally {
         setIsLoading(false);
       }
     };
-
     loadAuth();
   }, []);
 
-  // Keep the auth token getter in sync
   useEffect(() => {
     setAuthTokenGetter(() => token);
   }, [token]);
 
-  const setAuth = useCallback(
-    async (newToken: string, newUser: AuthUser) => {
-      await Promise.all([
-        AsyncStorage.setItem(TOKEN_KEY, newToken),
-        AsyncStorage.setItem(USER_KEY, JSON.stringify(newUser)),
-      ]);
-      setToken(newToken);
-      setUser(newUser);
-    },
-    [],
-  );
+  const setAuth = useCallback(async (newToken: string, newUser: AuthUser) => {
+    await Promise.all([
+      AsyncStorage.setItem(TOKEN_KEY, newToken),
+      AsyncStorage.setItem(USER_KEY, JSON.stringify(newUser)),
+    ]);
+    setToken(newToken);
+    setUser(newUser);
+  }, []);
 
   const logout = useCallback(async () => {
-    await Promise.all([
-      AsyncStorage.removeItem(TOKEN_KEY),
-      AsyncStorage.removeItem(USER_KEY),
-    ]);
+    // Clear React state FIRST so UI re-renders immediately
     setToken(null);
     setUser(null);
+    // Then clear storage (fire and forget is fine, state is already null)
+    try {
+      await AsyncStorage.multiRemove([TOKEN_KEY, USER_KEY]);
+    } catch {
+      // ignore
+    }
   }, []);
 
   return (

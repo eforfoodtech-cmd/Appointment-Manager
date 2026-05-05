@@ -6,9 +6,10 @@ import {
   useFonts,
 } from "@expo-google-fonts/inter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Stack, useRouter, useSegments } from "expo-router";
+import { Stack, useRouter, usePathname } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect } from "react";
+import { Platform } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
@@ -17,7 +18,6 @@ import { setBaseUrl } from "@workspace/api-client-react";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 
-// Set the API base URL from the environment
 setBaseUrl(`https://${process.env.EXPO_PUBLIC_DOMAIN}`);
 
 SplashScreen.preventAutoHideAsync();
@@ -31,26 +31,26 @@ const queryClient = new QueryClient({
   },
 });
 
+const AUTH_PATHS = ["/login", "/register"];
+
 function AuthGuard() {
   const { user, isLoading } = useAuth();
-  const segments = useSegments();
+  const pathname = usePathname();
   const router = useRouter();
 
   useEffect(() => {
     if (isLoading) return;
 
-    const inAuthGroup = segments[0] === "(auth)";
+    const isAuthScreen = AUTH_PATHS.some((p) => pathname === p || pathname.endsWith(p));
 
-    if (!user && !inAuthGroup) {
-      router.replace("/(auth)/login");
-    } else if (user && inAuthGroup) {
-      if (user.role === "barber") {
-        router.replace("/(barber)");
+    if (!user && !isAuthScreen) {
+      if (Platform.OS === "web") {
+        (window as Window & typeof globalThis).location.href = "/login";
       } else {
-        router.replace("/(customer)");
+        router.replace("/login");
       }
     }
-  }, [user, isLoading, segments]);
+  }, [user, isLoading, pathname]);
 
   return null;
 }

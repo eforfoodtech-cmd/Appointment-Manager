@@ -191,7 +191,19 @@ export default function BarberProfile() {
         onPress={() => {
           Alert.alert("Çıkış", "Hesabınızdan çıkmak istiyor musunuz?", [
             { text: "İptal", style: "cancel" },
-            { text: "Çıkış Yap", style: "destructive", onPress: async () => { await logout(); router.replace("/"); } },
+            {
+              text: "Çıkış Yap",
+              style: "destructive",
+              onPress: async () => {
+                await logout();
+                if (Platform.OS === "web") {
+                  // Most reliable on web: full page reload clears all state
+                  (window as Window & typeof globalThis).location.href = "/";
+                } else {
+                  router.replace("/");
+                }
+              },
+            },
           ]);
         }}
         activeOpacity={0.8}
