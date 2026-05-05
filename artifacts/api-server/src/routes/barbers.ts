@@ -367,7 +367,28 @@ router.post(
     const summary: Record<string, { inserted: number; skipped: boolean; closed?: boolean }> = {};
 
     for (const date of dates) {
-      // Skip days that already have slots — never overwrite
+      const dayOfWeek = new Date(date + "T12:00:00").getDay(); // 0=Sun…6=Sat
+
+      // If template marks this day as closed → delete unbooked slots, skip insert
+      if (hasTemplate) {
+        const tmpl = templateMap.get(dayOfWeek);
+        if (!tmpl || !tmpl.isOpen) {
+          await db
+            .delete(appointmentSlotsTable)
+            .where(
+              and(
+                eq(appointmentSlotsTable.barberId, barber.id),
+                eq(appointmentSlotsTable.date, date),
+                eq(appointmentSlotsTable.isBooked, false),
+              ),
+            );
+          summary[date] = { inserted: 0, skipped: false, closed: true };
+          req.log.info({ barberId: barber.id, date, dayOfWeek }, "seed-week: day closed, cleared unbooked slots");
+          continue;
+        }
+      }
+
+      // Skip open days that already have slots — never overwrite
       const existing = await db
         .select({ id: appointmentSlotsTable.id })
         .from(appointmentSlotsTable)
@@ -385,8 +406,6 @@ router.post(
         continue;
       }
 
-      const dayOfWeek = new Date(date + "T12:00:00").getDay(); // 0=Sun…6=Sat
-
       let slotPairs: Array<{ startTime: string; endTime: string }>;
 
       if (!hasTemplate) {
@@ -397,13 +416,7 @@ router.post(
         }));
         req.log.info({ barberId: barber.id, date, count: slotPairs.length }, "seed-week: no template, using default");
       } else {
-        const tmpl = templateMap.get(dayOfWeek);
-        if (!tmpl || !tmpl.isOpen) {
-          // Day is closed in template → no slots
-          summary[date] = { inserted: 0, skipped: false, closed: true };
-          req.log.info({ barberId: barber.id, date, dayOfWeek }, "seed-week: day closed in template");
-          continue;
-        }
+        const tmpl = templateMap.get(dayOfWeek)!; // already confirmed isOpen above
         slotPairs = generateSlotPairs(tmpl.startTime, tmpl.endTime, tmpl.slotDuration);
         req.log.info(
           { barberId: barber.id, date, dayOfWeek, count: slotPairs.length, template: tmpl },
