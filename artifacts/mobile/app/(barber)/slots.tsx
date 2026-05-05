@@ -2,7 +2,7 @@
  * Barber Slots — manage appointment slots by date.
  * Single-column list + bulk default slot creation (10:00–22:00).
  */
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -71,6 +71,9 @@ export default function SlotsScreen() {
   const { data: profile } = useGetMyBarberProfile();
   const barberId = profile?.id;
 
+  // Track which dates have been auto-initialized to avoid re-triggering
+  const autoInitDates = useRef<Set<string>>(new Set());
+
   const { data: slots, isLoading } = useGetBarberSlots(
     barberId!,
     { date: selectedDate },
@@ -115,14 +118,14 @@ export default function SlotsScreen() {
     });
   };
 
-  const handleCreateDefaultSlots = async () => {
+  const handleCreateDefaultSlots = async (date: string) => {
     if (!barberId) return;
     setIsCreatingDefaults(true);
     try {
       for (const hour of DEFAULT_HOURS) {
         await createSlot.mutateAsync({
           data: {
-            date: selectedDate,
+            date,
             startTime: `${pad(hour)}:00`,
             endTime: `${pad(hour + 1)}:00`,
             isAvailable: true,
@@ -131,12 +134,28 @@ export default function SlotsScreen() {
       }
       queryClient.invalidateQueries({ queryKey: ["getBarberSlots"] });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    } catch (err: any) {
-      Alert.alert("Hata", err?.data?.error || "Varsayılan slotlar oluşturulamadı");
+    } catch {
+      // silently ignore — slots may already exist
     } finally {
       setIsCreatingDefaults(false);
     }
   };
+
+  // Auto-create default slots when a date has none
+  useEffect(() => {
+    if (
+      !isLoading &&
+      !isCreatingDefaults &&
+      barberId &&
+      slots !== undefined &&
+      slots.length === 0 &&
+      !autoInitDates.current.has(selectedDate)
+    ) {
+      autoInitDates.current.add(selectedDate);
+      handleCreateDefaultSlots(selectedDate);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoading, slots, selectedDate, barberId]);
 
   const handleToggle = (slotId: number, isAvailable: boolean) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -199,8 +218,13 @@ export default function SlotsScreen() {
       </ScrollView>
 
       {/* Slots list */}
-      {isLoading ? (
-        <ActivityIndicator style={{ marginTop: 60 }} color={c.primary} />
+      {isLoading || isCreatingDefaults ? (
+        <View style={styles.empty}>
+          <ActivityIndicator color={c.primary} />
+          <Text style={styles.emptyText}>
+            {isCreatingDefaults ? "Varsayılan saatler ekleniyor…" : "Yükleniyor…"}
+          </Text>
+        </View>
       ) : (
         <FlatList
           data={slots ?? []}
@@ -210,43 +234,7 @@ export default function SlotsScreen() {
             <View style={styles.empty}>
               <Feather name="clock" size={40} color={c.border} />
               <Text style={styles.emptyText}>Bu gün için slot yok</Text>
-
-              {/* Default slots button */}
-              <TouchableOpacity
-                style={[styles.defaultBtn, isCreatingDefaults && { opacity: 0.7 }]}
-                onPress={handleCreateDefaultSlots}
-                disabled={isCreatingDefaults}
-                activeOpacity={0.8}
-              >
-                {isCreatingDefaults ? (
-                  <ActivityIndicator color="#fff" size="small" />
-                ) : (
-                  <>
-                    <Feather name="zap" size={16} color="#fff" />
-                    <Text style={styles.defaultBtnText}>Varsayılan Saatleri Ekle (10:00–22:00)</Text>
-                  </>
-                )}
-              </TouchableOpacity>
             </View>
-          }
-          ListHeaderComponent={
-            slots && slots.length > 0 ? (
-              <TouchableOpacity
-                style={[styles.defaultBtnSmall, isCreatingDefaults && { opacity: 0.7 }]}
-                onPress={handleCreateDefaultSlots}
-                disabled={isCreatingDefaults}
-                activeOpacity={0.8}
-              >
-                {isCreatingDefaults ? (
-                  <ActivityIndicator color={c.primary} size="small" />
-                ) : (
-                  <>
-                    <Feather name="zap" size={14} color={c.primary} />
-                    <Text style={styles.defaultBtnSmallText}>Varsayılan Saatleri Ekle</Text>
-                  </>
-                )}
-              </TouchableOpacity>
-            ) : null
           }
           renderItem={({ item: slot }) => (
             <View
@@ -472,33 +460,6 @@ const styles = StyleSheet.create({
 
   empty: { alignItems: "center", paddingVertical: 40, gap: 16 },
   emptyText: { fontSize: 15, fontFamily: "Inter_500Medium", color: c.mutedForeground },
-
-  defaultBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    backgroundColor: c.primary,
-    borderRadius: colors.radius,
-    paddingVertical: 14,
-    paddingHorizontal: 20,
-    marginTop: 8,
-  },
-  defaultBtnText: { fontSize: 14, fontFamily: "Inter_600SemiBold", color: "#fff" },
-
-  defaultBtnSmall: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    alignSelf: "flex-start",
-    backgroundColor: c.primary + "15",
-    borderRadius: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    marginBottom: 8,
-    borderWidth: 1,
-    borderColor: c.primary + "40",
-  },
-  defaultBtnSmallText: { fontSize: 13, fontFamily: "Inter_600SemiBold", color: c.primary },
 
   modalOverlay: {
     flex: 1,
