@@ -30,9 +30,11 @@ import {
   useGetMyAvailability,
   useSetMyAvailability,
   getGetMyAvailabilityQueryKey,
+  customFetch,
 } from "@workspace/api-client-react";
 import type { SlotAppointmentDetail } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
+import { useToast } from "@/components/Toast";
 import colors from "@/constants/colors";
 
 const c = colors.light;
@@ -255,13 +257,19 @@ export default function SlotsScreen() {
   });
 
   // ── Weekly template helpers ────────────────────────────────────────────────
+  const { showToast, ToastComponent } = useToast();
   const { data: availabilityData } = useGetMyAvailability();
   const setAvailability = useSetMyAvailability({
     mutation: {
-      onSuccess: () =>
-        queryClient.invalidateQueries({ queryKey: getGetMyAvailabilityQueryKey() }),
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getGetMyAvailabilityQueryKey() });
+        customFetch("/api/barbers/me/slots/seed-week", { method: "POST" })
+          .then(() => queryClient.invalidateQueries({ queryKey: ["getBarberSlots"] }))
+          .catch(() => {});
+        showToast("Haftalık şablon güncellendi", "success");
+      },
       onError: (err: any) =>
-        Alert.alert("Hata", err?.data?.error ?? "Şablon güncellenemedi"),
+        showToast(err?.data?.error ?? "Şablon güncellenemedi", "error"),
     },
   });
 
@@ -598,6 +606,8 @@ export default function SlotsScreen() {
         appointment={detailSlot?.appointment ?? null}
         onClose={() => setDetailSlot(null)}
       />
+
+      {ToastComponent}
     </View>
   );
 }

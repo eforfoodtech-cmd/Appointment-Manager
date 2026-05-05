@@ -27,10 +27,12 @@ import {
   getGetMyBarberProfileQueryKey,
   getListBlocksQueryKey,
   getGetMyAvailabilityQueryKey,
+  customFetch,
 } from "@workspace/api-client-react";
 import type { AvailabilityInput } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/context/AuthContext";
+import { useToast } from "@/components/Toast";
 import colors from "@/constants/colors";
 
 const c = colors.light;
@@ -59,6 +61,7 @@ export default function BarberProfile() {
   const insets = useSafeAreaInsets();
   const { user, logout } = useAuth();
   const queryClient = useQueryClient();
+  const { showToast, ToastComponent } = useToast();
   const [editMode, setEditMode] = useState(false);
   const [scheduleEditing, setScheduleEditing] = useState(false);
 
@@ -120,8 +123,13 @@ export default function BarberProfile() {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: getGetMyAvailabilityQueryKey() });
         setScheduleEditing(false);
+        customFetch("/api/barbers/me/slots/seed-week", { method: "POST" })
+          .then(() => queryClient.invalidateQueries({ queryKey: ["getBarberSlots"] }))
+          .catch(() => {});
+        showToast("Haftalık program kaydedildi", "success");
       },
-      onError: (err: any) => Alert.alert("Hata", err?.data?.error || "Program kaydedilemedi"),
+      onError: (err: any) =>
+        showToast(err?.data?.error || "Program kaydedilemedi", "error"),
     },
   });
 
@@ -183,6 +191,7 @@ export default function BarberProfile() {
   }
 
   return (
+    <View style={styles.container}>
     <ScrollView
       style={styles.scroll}
       contentContainerStyle={{ paddingTop, paddingBottom: insets.bottom + 100 }}
@@ -358,6 +367,8 @@ export default function BarberProfile() {
         <Text style={styles.logoutText}>Çıkış Yap</Text>
       </TouchableOpacity>
     </ScrollView>
+    {ToastComponent}
+    </View>
   );
 }
 
