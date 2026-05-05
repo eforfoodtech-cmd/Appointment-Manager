@@ -2,7 +2,7 @@
  * Barber Slots — manage appointment slots by date.
  * Single-column list + bulk default slot creation (10:00–22:00).
  */
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState } from "react";
 import {
   View,
   Text,
@@ -26,7 +26,6 @@ import {
   useDeleteSlot,
   getGetBarberSlotsQueryKey,
   useGetMyBarberProfile,
-  customFetch,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import colors from "@/constants/colors";
@@ -65,9 +64,6 @@ export default function SlotsScreen() {
   const [showModal, setShowModal] = useState(false);
   const [startTime, setStartTime] = useState("09:00");
   const [endTime, setEndTime] = useState("10:00");
-  const [isSeeding, setIsSeeding] = useState(false);
-  const seededRef = useRef(false);
-
   const { data: profile } = useGetMyBarberProfile();
   const barberId = profile?.id;
 
@@ -107,26 +103,6 @@ export default function SlotsScreen() {
       },
     },
   });
-
-  // Seed all 7 days once when barberId becomes available
-  const seedWeek = useCallback(async (id: number) => {
-    if (seededRef.current) return;
-    seededRef.current = true;
-    setIsSeeding(true);
-    try {
-      await customFetch("/api/barbers/me/slots/seed-week", { method: "POST" });
-      queryClient.invalidateQueries({ queryKey: ["getBarberSlots"] });
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    } catch {
-      // silently ignore — may already be seeded
-    } finally {
-      setIsSeeding(false);
-    }
-  }, [queryClient]);
-
-  useEffect(() => {
-    if (barberId) seedWeek(barberId);
-  }, [barberId, seedWeek]);
 
   const handleCreateSlot = () => {
     if (!startTime || !endTime) return;
@@ -196,12 +172,10 @@ export default function SlotsScreen() {
       </ScrollView>
 
       {/* Slots list */}
-      {isLoading || isSeeding ? (
+      {isLoading ? (
         <View style={styles.empty}>
           <ActivityIndicator color={c.primary} />
-          <Text style={styles.emptyText}>
-            {isSeeding ? "Saatler hazırlanıyor…" : "Yükleniyor…"}
-          </Text>
+          <Text style={styles.emptyText}>Yükleniyor…</Text>
         </View>
       ) : (
         <FlatList

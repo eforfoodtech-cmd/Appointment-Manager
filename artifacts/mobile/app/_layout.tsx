@@ -8,12 +8,12 @@ import {
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Stack, useRouter, usePathname } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
-import React, { useEffect } from "react";
+import React, { useEffect, useRef } from "react";
 import { Platform } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
-import { setBaseUrl } from "@workspace/api-client-react";
+import { setBaseUrl, customFetch } from "@workspace/api-client-react";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
@@ -32,6 +32,20 @@ const queryClient = new QueryClient({
 });
 
 const AUTH_PATHS = ["/login", "/register"];
+
+function BarberSeeder() {
+  const { user } = useAuth();
+  const seededRef = useRef(false);
+
+  useEffect(() => {
+    if (user?.role === "barber" && !seededRef.current) {
+      seededRef.current = true;
+      customFetch("/api/barbers/me/slots/seed-week", { method: "POST" }).catch(() => {});
+    }
+  }, [user]);
+
+  return null;
+}
 
 function AuthGuard() {
   const { user, isLoading } = useAuth();
@@ -59,6 +73,7 @@ function RootLayoutNav() {
   return (
     <>
       <AuthGuard />
+      <BarberSeeder />
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="index" />
         <Stack.Screen name="(auth)" />
