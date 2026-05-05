@@ -63,8 +63,15 @@ export default function BarberProfile() {
 
   const removeBlock = useRemoveBlock({
     mutation: {
-      onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: getListBlocksQueryKey() });
+      onSuccess: (_data, variables) => {
+        // Optimistic update: remove the block from cache immediately
+        queryClient.setQueryData(
+          getListBlocksQueryKey(),
+          (old: any[] | undefined) =>
+            old?.filter((b) => b.id !== variables.blockId) ?? [],
+        );
+        // Also force a refetch so data stays consistent
+        queryClient.refetchQueries({ queryKey: getListBlocksQueryKey() });
       },
       onError: (err: any) => {
         Alert.alert("Hata", err?.data?.error || "Engel kaldırılamadı");
