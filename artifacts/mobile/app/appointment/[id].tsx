@@ -176,15 +176,6 @@ export default function AppointmentDetail() {
       style={styles.scroll}
       contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}
     >
-      {/* Header with back button */}
-      <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
-        <TouchableOpacity style={styles.backBtn} onPress={goBack} activeOpacity={0.7}>
-          <Feather name="arrow-left" size={22} color={c.foreground} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Randevu Detayı</Text>
-        <View style={{ width: 38 }} />
-      </View>
-
       {/* Mutation loading overlay */}
       {isMutating && (
         <View style={styles.mutatingBanner}>

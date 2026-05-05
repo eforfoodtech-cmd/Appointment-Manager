@@ -121,15 +121,6 @@ export default function BookingScreen() {
 
   return (
     <View style={[styles.container, { paddingBottom: insets.bottom + 20 }]}>
-      {/* Header with back button */}
-      <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => router.back()} activeOpacity={0.7}>
-          <Feather name="arrow-left" size={22} color={c.foreground} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Randevu Al</Text>
-        <View style={{ width: 38 }} />
-      </View>
-
       {/* Barber info */}
       <View style={styles.barberCard}>
         <View style={styles.avatar}>
