@@ -190,6 +190,10 @@ export default function SlotsScreen() {
   const invalidateSlots = () =>
     queryClient.invalidateQueries({ queryKey: ["getBarberSlots"] });
 
+  const slotsQueryKey = barberId
+    ? getGetBarberSlotsQueryKey(barberId, { date: selectedDate })
+    : null;
+
   const createSlot = useCreateSlot({
     mutation: {
       onSuccess: () => {
@@ -204,20 +208,46 @@ export default function SlotsScreen() {
 
   const updateSlot = useUpdateSlot({
     mutation: {
-      onSuccess: () => invalidateSlots(),
-      onError: (err: any) =>
-        Alert.alert("Hata", err?.data?.error ?? "Slot güncellenemedi"),
+      onMutate: async ({ slotId, data }) => {
+        if (!slotsQueryKey) return;
+        await queryClient.cancelQueries({ queryKey: slotsQueryKey });
+        const prev = queryClient.getQueryData(slotsQueryKey);
+        queryClient.setQueryData(slotsQueryKey, (old: any) =>
+          Array.isArray(old)
+            ? old.map((s: any) =>
+                s.id === slotId ? { ...s, ...data } : s,
+              )
+            : old,
+        );
+        return { prev };
+      },
+      onError: (err: any, _vars, ctx: any) => {
+        if (slotsQueryKey && ctx?.prev !== undefined)
+          queryClient.setQueryData(slotsQueryKey, ctx.prev);
+        Alert.alert("Hata", err?.data?.error ?? "Slot güncellenemedi");
+      },
+      onSettled: () => invalidateSlots(),
     },
   });
 
   const deleteSlot = useDeleteSlot({
     mutation: {
-      onSuccess: () => {
-        invalidateSlots();
+      onMutate: async ({ slotId }) => {
+        if (!slotsQueryKey) return;
+        await queryClient.cancelQueries({ queryKey: slotsQueryKey });
+        const prev = queryClient.getQueryData(slotsQueryKey);
+        queryClient.setQueryData(slotsQueryKey, (old: any) =>
+          Array.isArray(old) ? old.filter((s: any) => s.id !== slotId) : old,
+        );
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+        return { prev };
       },
-      onError: (err: any) =>
-        Alert.alert("Hata", err?.data?.error ?? "Slot silinemedi"),
+      onError: (err: any, _vars, ctx: any) => {
+        if (slotsQueryKey && ctx?.prev !== undefined)
+          queryClient.setQueryData(slotsQueryKey, ctx.prev);
+        Alert.alert("Hata", err?.data?.error ?? "Slot silinemedi");
+      },
+      onSettled: () => invalidateSlots(),
     },
   });
 
