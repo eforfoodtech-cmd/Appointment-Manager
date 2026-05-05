@@ -331,7 +331,7 @@ router.post(
     const summary: Record<string, { inserted: number; skipped: boolean }> = {};
 
     for (const date of dates) {
-      // Count existing slots for this day — if any exist, skip entirely
+      // If day already has any slots — leave it completely untouched
       const existing = await db
         .select({ id: appointmentSlotsTable.id })
         .from(appointmentSlotsTable)
@@ -349,14 +349,57 @@ router.post(
         continue;
       }
 
-      // Day is empty — insert all 13 standard slots
-      const toInsert = DEFAULT_HOURS.map((hour) => ({
+      // Day is empty — try to use the same weekday from 7 days ago as template.
+      // This preserves intentional deletions: if barber removed 10:00 last Tuesday,
+      // next Tuesday also won't have 10:00.
+      const prevDate = new Date(date + "T12:00:00");
+      prevDate.setDate(prevDate.getDate() - 7);
+      const prevDateStr = prevDate.toISOString().split("T")[0]!;
+
+      const prevSlots = await db
+        .select({
+          startTime: appointmentSlotsTable.startTime,
+          endTime: appointmentSlotsTable.endTime,
+        })
+        .from(appointmentSlotsTable)
+        .where(
+          and(
+            eq(appointmentSlotsTable.barberId, barber.id),
+            eq(appointmentSlotsTable.date, prevDateStr),
+          ),
+        );
+
+      let slotPairs: Array<{ startTime: string; endTime: string }>;
+
+      if (prevSlots.length > 0) {
+        // Copy last week's pattern (only the time pairs, not availability/booking state)
+        slotPairs = prevSlots.map((s) => ({
+          startTime: s.startTime,
+          endTime: s.endTime,
+        }));
+        req.log.info(
+          { barberId: barber.id, date, template: prevDateStr, count: slotPairs.length },
+          "seed-week: using previous week template",
+        );
+      } else {
+        // No previous week data — fall back to default 13 standard slots
+        slotPairs = DEFAULT_HOURS.map((hour) => ({
+          startTime: `${String(hour).padStart(2, "0")}:00`,
+          endTime:   `${String(hour + 1).padStart(2, "0")}:00`,
+        }));
+        req.log.info(
+          { barberId: barber.id, date, count: slotPairs.length },
+          "seed-week: using default template",
+        );
+      }
+
+      const toInsert = slotPairs.map((p) => ({
         barberId: barber.id,
         date,
-        startTime: `${String(hour).padStart(2, "0")}:00`,
-        endTime:   `${String(hour + 1).padStart(2, "0")}:00`,
+        startTime: p.startTime,
+        endTime: p.endTime,
         isAvailable: true,
-        isBooked:    false,
+        isBooked: false,
       }));
 
       await db.insert(appointmentSlotsTable).values(toInsert);
