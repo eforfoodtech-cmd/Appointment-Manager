@@ -193,7 +193,9 @@ export default function SlotsScreen() {
   );
 
   const invalidateSlots = () =>
-    queryClient.invalidateQueries({ queryKey: ["getBarberSlots"] });
+    queryClient.invalidateQueries({
+      predicate: (q) => typeof q.queryKey[0] === "string" && (q.queryKey[0] as string).includes("/slots"),
+    });
 
   const slotsQueryKey = barberId
     ? getGetBarberSlotsQueryKey(barberId, { date: selectedDate })
@@ -264,7 +266,13 @@ export default function SlotsScreen() {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: getGetMyAvailabilityQueryKey() });
         customFetch("/api/barbers/me/slots/seed-week", { method: "POST" })
-          .then(() => queryClient.invalidateQueries({ queryKey: ["getBarberSlots"] }))
+          .then(() =>
+            queryClient.invalidateQueries({
+              predicate: (q) =>
+                typeof q.queryKey[0] === "string" &&
+                (q.queryKey[0] as string).includes("/slots"),
+            }),
+          )
           .catch(() => {});
         showToast("Haftalık şablon güncellendi", "success");
       },

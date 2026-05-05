@@ -124,7 +124,13 @@ export default function BarberProfile() {
         queryClient.invalidateQueries({ queryKey: getGetMyAvailabilityQueryKey() });
         setScheduleEditing(false);
         customFetch("/api/barbers/me/slots/seed-week", { method: "POST" })
-          .then(() => queryClient.invalidateQueries({ queryKey: ["getBarberSlots"] }))
+          .then(() =>
+            queryClient.invalidateQueries({
+              predicate: (q) =>
+                typeof q.queryKey[0] === "string" &&
+                (q.queryKey[0] as string).includes("/slots"),
+            }),
+          )
           .catch(() => {});
         showToast("Haftalık program kaydedildi", "success");
       },
