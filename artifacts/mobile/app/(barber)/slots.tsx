@@ -2,7 +2,7 @@
  * Barber Slots — manage appointment slots by date.
  * Single-column list + bulk default slot creation (10:00–22:00).
  */
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
   View,
   Text,
@@ -26,18 +26,17 @@ import {
   useDeleteSlot,
   getGetBarberSlotsQueryKey,
   useGetMyBarberProfile,
+  customFetch,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import colors from "@/constants/colors";
 
 const c = colors.light;
 
-const DEFAULT_HOURS = Array.from({ length: 12 }, (_, i) => i + 10); // 10..21
-
-function getNext14Days() {
+function getNext7Days() {
   const days = [];
   const today = new Date();
-  for (let i = 0; i < 14; i++) {
+  for (let i = 0; i < 7; i++) {
     const d = new Date(today);
     d.setDate(today.getDate() + i);
     days.push(d.toISOString().split("T")[0]!);
@@ -61,18 +60,16 @@ function pad(n: number) {
 export default function SlotsScreen() {
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
-  const days = getNext14Days();
+  const days = getNext7Days();
   const [selectedDate, setSelectedDate] = useState(days[0]!);
   const [showModal, setShowModal] = useState(false);
   const [startTime, setStartTime] = useState("09:00");
   const [endTime, setEndTime] = useState("10:00");
-  const [isCreatingDefaults, setIsCreatingDefaults] = useState(false);
+  const [isSeeding, setIsSeeding] = useState(false);
+  const seededRef = useRef(false);
 
   const { data: profile } = useGetMyBarberProfile();
   const barberId = profile?.id;
-
-  // Track which dates have been auto-initialized to avoid re-triggering
-  const autoInitDates = useRef<Set<string>>(new Set());
 
   const { data: slots, isLoading } = useGetBarberSlots(
     barberId!,
@@ -111,51 +108,32 @@ export default function SlotsScreen() {
     },
   });
 
+  // Seed all 7 days once when barberId becomes available
+  const seedWeek = useCallback(async (id: number) => {
+    if (seededRef.current) return;
+    seededRef.current = true;
+    setIsSeeding(true);
+    try {
+      await customFetch("/api/barbers/me/slots/seed-week", { method: "POST" });
+      queryClient.invalidateQueries({ queryKey: ["getBarberSlots"] });
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch {
+      // silently ignore — may already be seeded
+    } finally {
+      setIsSeeding(false);
+    }
+  }, [queryClient]);
+
+  useEffect(() => {
+    if (barberId) seedWeek(barberId);
+  }, [barberId, seedWeek]);
+
   const handleCreateSlot = () => {
     if (!startTime || !endTime) return;
     createSlot.mutate({
       data: { date: selectedDate, startTime, endTime, isAvailable: true },
     });
   };
-
-  const handleCreateDefaultSlots = async (date: string) => {
-    if (!barberId) return;
-    setIsCreatingDefaults(true);
-    try {
-      for (const hour of DEFAULT_HOURS) {
-        await createSlot.mutateAsync({
-          data: {
-            date,
-            startTime: `${pad(hour)}:00`,
-            endTime: `${pad(hour + 1)}:00`,
-            isAvailable: true,
-          },
-        });
-      }
-      queryClient.invalidateQueries({ queryKey: ["getBarberSlots"] });
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    } catch {
-      // silently ignore — slots may already exist
-    } finally {
-      setIsCreatingDefaults(false);
-    }
-  };
-
-  // Auto-create default slots when a date has none
-  useEffect(() => {
-    if (
-      !isLoading &&
-      !isCreatingDefaults &&
-      barberId &&
-      slots !== undefined &&
-      slots.length === 0 &&
-      !autoInitDates.current.has(selectedDate)
-    ) {
-      autoInitDates.current.add(selectedDate);
-      handleCreateDefaultSlots(selectedDate);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isLoading, slots, selectedDate, barberId]);
 
   const handleToggle = (slotId: number, isAvailable: boolean) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -218,11 +196,11 @@ export default function SlotsScreen() {
       </ScrollView>
 
       {/* Slots list */}
-      {isLoading || isCreatingDefaults ? (
+      {isLoading || isSeeding ? (
         <View style={styles.empty}>
           <ActivityIndicator color={c.primary} />
           <Text style={styles.emptyText}>
-            {isCreatingDefaults ? "Varsayılan saatler ekleniyor…" : "Yükleniyor…"}
+            {isSeeding ? "Saatler hazırlanıyor…" : "Yükleniyor…"}
           </Text>
         </View>
       ) : (

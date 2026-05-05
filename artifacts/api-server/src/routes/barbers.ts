@@ -292,6 +292,67 @@ router.get(
   },
 );
 
+// ─── POST /api/barbers/me/slots/seed-week ─────────────────────────────────────
+// Creates default hourly slots (10:00–22:00) for any of the next 7 days that
+// currently have zero slots.  Idempotent: days that already have slots are skipped.
+router.post(
+  "/me/slots/seed-week",
+  authenticate,
+  requireBarber,
+  async (req: AuthRequest, res) => {
+    const [barber] = await db
+      .select({ id: barbersTable.id })
+      .from(barbersTable)
+      .where(eq(barbersTable.userId, req.user!.id))
+      .limit(1);
+
+    if (!barber) {
+      res.status(404).json({ error: "Berber profili bulunamadı" });
+      return;
+    }
+
+    const today = new Date();
+    const dates: string[] = [];
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(today);
+      d.setDate(today.getDate() + i);
+      dates.push(d.toISOString().split("T")[0]!);
+    }
+
+    const DEFAULT_HOURS = Array.from({ length: 12 }, (_, i) => i + 10); // 10..21
+    let seededDates = 0;
+
+    for (const date of dates) {
+      const [existing] = await db
+        .select({ id: appointmentSlotsTable.id })
+        .from(appointmentSlotsTable)
+        .where(
+          and(
+            eq(appointmentSlotsTable.barberId, barber.id),
+            eq(appointmentSlotsTable.date, date),
+          ),
+        )
+        .limit(1);
+
+      if (!existing) {
+        await db.insert(appointmentSlotsTable).values(
+          DEFAULT_HOURS.map((hour) => ({
+            barberId: barber.id,
+            date,
+            startTime: `${String(hour).padStart(2, "0")}:00`,
+            endTime: `${String(hour + 1).padStart(2, "0")}:00`,
+            isAvailable: true,
+            isBooked: false,
+          })),
+        );
+        seededDates++;
+      }
+    }
+
+    res.json({ seededDates, dates });
+  },
+);
+
 // ─── GET /api/barbers/me/slots (all slots for this barber) ───────────────────
 router.post(
   "/me/slots",

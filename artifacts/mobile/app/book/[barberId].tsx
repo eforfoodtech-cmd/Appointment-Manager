@@ -29,10 +29,10 @@ import colors from "@/constants/colors";
 
 const c = colors.light;
 
-function getNext14Days() {
+function getNext7Days() {
   const days = [];
   const today = new Date();
-  for (let i = 0; i < 14; i++) {
+  for (let i = 0; i < 7; i++) {
     const d = new Date(today);
     d.setDate(today.getDate() + i);
     days.push(d.toISOString().split("T")[0]!);
@@ -53,7 +53,7 @@ export default function BookingScreen() {
   const { barberId } = useLocalSearchParams<{ barberId: string }>();
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
-  const days = getNext14Days();
+  const days = getNext7Days();
   const [selectedDate, setSelectedDate] = useState(days[0]!);
   const [selectedSlotId, setSelectedSlotId] = useState<number | null>(null);
 
