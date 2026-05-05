@@ -90,6 +90,16 @@ export default function BookingScreen() {
     },
   });
 
+  const todayStr = new Date().toISOString().split("T")[0]!;
+  const currentHour = new Date().getHours();
+
+  // A slot is "past" if it's today and its start hour has already passed
+  const isPastSlot = (startTime: string) => {
+    if (selectedDate !== todayStr) return false;
+    const slotHour = parseInt(startTime.split(":")[0]!, 10);
+    return slotHour < currentHour;
+  };
+
   // Show all barber-opened slots: available ones selectable, booked ones shown as "Dolu"
   const displaySlots = (slots ?? []).filter((s) => s.isAvailable);
 
@@ -188,34 +198,39 @@ export default function BookingScreen() {
             renderItem={({ item: slot }) => {
               const isSelected = slot.id === selectedSlotId;
               const isBooked = slot.isBooked;
+              const isPast = isPastSlot(slot.startTime);
+              const isDisabled = isBooked || isPast;
               return (
                 <TouchableOpacity
                   style={[
                     styles.slot,
                     isBooked && styles.slotBooked,
-                    !isBooked && isSelected && styles.slotSelected,
+                    isPast && !isBooked && styles.slotPast,
+                    !isDisabled && isSelected && styles.slotSelected,
                   ]}
                   onPress={() => {
-                    if (isBooked) return;
+                    if (isDisabled) return;
                     setSelectedSlotId(isSelected ? null : slot.id);
                     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                   }}
-                  activeOpacity={isBooked ? 1 : 0.7}
-                  disabled={isBooked}
+                  activeOpacity={isDisabled ? 1 : 0.7}
+                  disabled={isDisabled}
                 >
                   {/* Time */}
                   <View style={styles.slotTimeCol}>
                     <Text style={[
                       styles.slotTime,
                       isBooked && styles.slotTimeBooked,
-                      !isBooked && isSelected && styles.slotTimeSelected,
+                      isPast && !isBooked && styles.slotTimePast,
+                      !isDisabled && isSelected && styles.slotTimeSelected,
                     ]}>
                       {slot.startTime}
                     </Text>
                     <Text style={[
                       styles.slotEndTime,
                       isBooked && styles.slotTimeBooked,
-                      !isBooked && isSelected && styles.slotTimeSelected,
+                      isPast && !isBooked && styles.slotTimePast,
+                      !isDisabled && isSelected && styles.slotTimeSelected,
                     ]}>
                       {slot.endTime}
                     </Text>
@@ -225,6 +240,10 @@ export default function BookingScreen() {
                   {isBooked ? (
                     <View style={styles.badgeBooked}>
                       <Text style={styles.badgeBookedText}>Dolu</Text>
+                    </View>
+                  ) : isPast ? (
+                    <View style={styles.badgePast}>
+                      <Text style={styles.badgePastText}>Geçti</Text>
                     </View>
                   ) : isSelected ? (
                     <View style={styles.badgeSelected}>
@@ -350,11 +369,13 @@ const styles = StyleSheet.create({
   },
   slotSelected: { backgroundColor: c.primary + "15", borderColor: c.primary },
   slotBooked: { backgroundColor: "#FEF2F2", borderColor: "#FECACA" },
+  slotPast:   { backgroundColor: "#F3F4F6", borderColor: "#E5E7EB" },
   slotTimeCol: { width: 60 },
   slotTime: { fontSize: 16, fontFamily: "Inter_700Bold", color: c.foreground },
   slotEndTime: { fontSize: 12, fontFamily: "Inter_400Regular", color: c.mutedForeground, marginTop: 1 },
   slotTimeSelected: { color: c.primary },
   slotTimeBooked: { color: "#EF4444" },
+  slotTimePast:   { color: "#9CA3AF" },
   badgeOpen: {
     flex: 1,
     backgroundColor: "#D1FAE5",
@@ -382,6 +403,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   badgeBookedText: { fontSize: 12, fontFamily: "Inter_600SemiBold", color: "#EF4444" },
+  badgePast: {
+    flex: 1,
+    backgroundColor: "#F3F4F6",
+    borderRadius: 6,
+    paddingVertical: 5,
+    paddingHorizontal: 12,
+  },
+  badgePastText: { fontSize: 12, fontFamily: "Inter_600SemiBold", color: "#9CA3AF" },
   empty: { alignItems: "center", paddingVertical: 40, gap: 10 },
   emptyText: { fontSize: 14, fontFamily: "Inter_400Regular", color: c.mutedForeground },
   bookBtn: {
