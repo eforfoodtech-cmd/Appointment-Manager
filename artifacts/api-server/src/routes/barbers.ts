@@ -332,7 +332,37 @@ router.post(
     let totalInserted = 0;
     const summary: Record<string, { deleted: number; inserted: number }> = {};
 
+    // Standard (start_time, end_time) pairs: (10:00,11:00) … (22:00,23:00)
+    const STANDARD_PAIRS = DEFAULT_HOURS.map((h) => ({
+      start: `${String(h).padStart(2, "0")}:00`,
+      end:   `${String(h + 1).padStart(2, "0")}:00`,
+    }));
+    // Build VALUES clause: (start, end), (start, end), …
+    const STANDARD_PAIRS_SQL = sql.join(
+      STANDARD_PAIRS.map((p) => sql`(${p.start}, ${p.end})`),
+      sql`, `,
+    );
+
     for (const date of dates) {
+      // ── Step 0: purge non-standard slots (09:xx, xx:30, wrong duration, etc.)
+      // A slot is non-standard if its (start_time, end_time) pair is NOT one of
+      // the 13 canonical hourly pairs.  We cascade-delete appointments first.
+      await db.execute(
+        sql`DELETE FROM appointments
+            WHERE slot_id IN (
+              SELECT id FROM appointment_slots
+              WHERE barber_id = ${barber.id}
+                AND date       = ${date}
+                AND (start_time, end_time) NOT IN (${STANDARD_PAIRS_SQL})
+            )`,
+      );
+      await db.execute(
+        sql`DELETE FROM appointment_slots
+            WHERE barber_id = ${barber.id}
+              AND date       = ${date}
+              AND (start_time, end_time) NOT IN (${STANDARD_PAIRS_SQL})`,
+      );
+
       // ── Step 1: delete appointment-free slots ────────────────────────────────
       // Only removes slots that have NO appointment row referencing them at all.
       // Slots tied to any appointment (booked, cancelled, no-show, etc.) are kept.
