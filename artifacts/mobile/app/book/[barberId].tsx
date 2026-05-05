@@ -183,10 +183,8 @@ export default function BookingScreen() {
           <FlatList
             data={displaySlots}
             keyExtractor={(s) => String(s.id)}
-            numColumns={3}
             scrollEnabled={false}
             contentContainerStyle={styles.slotGrid}
-            columnWrapperStyle={{ gap: 10 }}
             renderItem={({ item: slot }) => {
               const isSelected = slot.id === selectedSlotId;
               const isBooked = slot.isBooked;
@@ -205,15 +203,38 @@ export default function BookingScreen() {
                   activeOpacity={isBooked ? 1 : 0.7}
                   disabled={isBooked}
                 >
-                  <Text style={[
-                    styles.slotTime,
-                    isBooked && styles.slotTimeBooked,
-                    !isBooked && isSelected && styles.slotTimeSelected,
-                  ]}>
-                    {slot.startTime}
-                  </Text>
-                  {isBooked && (
-                    <Text style={styles.slotTagBooked}>Dolu</Text>
+                  {/* Time */}
+                  <View style={styles.slotTimeCol}>
+                    <Text style={[
+                      styles.slotTime,
+                      isBooked && styles.slotTimeBooked,
+                      !isBooked && isSelected && styles.slotTimeSelected,
+                    ]}>
+                      {slot.startTime}
+                    </Text>
+                    <Text style={[
+                      styles.slotEndTime,
+                      isBooked && styles.slotTimeBooked,
+                      !isBooked && isSelected && styles.slotTimeSelected,
+                    ]}>
+                      {slot.endTime}
+                    </Text>
+                  </View>
+
+                  {/* Status / selection */}
+                  {isBooked ? (
+                    <View style={styles.badgeBooked}>
+                      <Text style={styles.badgeBookedText}>Dolu</Text>
+                    </View>
+                  ) : isSelected ? (
+                    <View style={styles.badgeSelected}>
+                      <Feather name="check" size={14} color="#fff" />
+                      <Text style={styles.badgeSelectedText}>Seçildi</Text>
+                    </View>
+                  ) : (
+                    <View style={styles.badgeOpen}>
+                      <Text style={styles.badgeOpenText}>Müsait</Text>
+                    </View>
                   )}
                 </TouchableOpacity>
               );
@@ -315,22 +336,52 @@ const styles = StyleSheet.create({
   dayDateActive: { color: "#fff" },
   dayMonth: { fontSize: 10, fontFamily: "Inter_400Regular", color: c.mutedForeground },
   dayMonthActive: { color: "rgba(255,255,255,0.7)" },
-  slotGrid: { paddingHorizontal: 16, gap: 10, paddingBottom: 20 },
+  slotGrid: { paddingHorizontal: 16, gap: 8, paddingBottom: 20 },
   slot: {
-    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
     backgroundColor: c.card,
     borderRadius: colors.radius,
     paddingVertical: 14,
-    alignItems: "center",
+    paddingHorizontal: 16,
     borderWidth: 1.5,
     borderColor: c.border,
+    gap: 12,
   },
-  slotSelected: { backgroundColor: c.primary, borderColor: c.primary },
+  slotSelected: { backgroundColor: c.primary + "15", borderColor: c.primary },
   slotBooked: { backgroundColor: "#FEF2F2", borderColor: "#FECACA" },
-  slotTime: { fontSize: 13, fontFamily: "Inter_600SemiBold", color: c.foreground },
-  slotTimeSelected: { color: "#fff" },
+  slotTimeCol: { width: 60 },
+  slotTime: { fontSize: 16, fontFamily: "Inter_700Bold", color: c.foreground },
+  slotEndTime: { fontSize: 12, fontFamily: "Inter_400Regular", color: c.mutedForeground, marginTop: 1 },
+  slotTimeSelected: { color: c.primary },
   slotTimeBooked: { color: "#EF4444" },
-  slotTagBooked: { fontSize: 10, fontFamily: "Inter_600SemiBold", color: "#EF4444" },
+  badgeOpen: {
+    flex: 1,
+    backgroundColor: "#D1FAE5",
+    borderRadius: 6,
+    paddingVertical: 5,
+    paddingHorizontal: 12,
+  },
+  badgeOpenText: { fontSize: 12, fontFamily: "Inter_600SemiBold", color: "#059669" },
+  badgeSelected: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: c.primary,
+    borderRadius: 6,
+    paddingVertical: 5,
+    paddingHorizontal: 12,
+  },
+  badgeSelectedText: { fontSize: 12, fontFamily: "Inter_600SemiBold", color: "#fff" },
+  badgeBooked: {
+    flex: 1,
+    backgroundColor: "#FEF2F2",
+    borderRadius: 6,
+    paddingVertical: 5,
+    paddingHorizontal: 12,
+  },
+  badgeBookedText: { fontSize: 12, fontFamily: "Inter_600SemiBold", color: "#EF4444" },
   empty: { alignItems: "center", paddingVertical: 40, gap: 10 },
   emptyText: { fontSize: 14, fontFamily: "Inter_400Regular", color: c.mutedForeground },
   bookBtn: {
