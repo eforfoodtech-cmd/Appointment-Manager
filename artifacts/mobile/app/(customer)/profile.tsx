@@ -65,7 +65,7 @@ export default function CustomerProfile() {
         onPress={() =>
           Alert.alert("Çıkış", "Hesabınızdan çıkmak istiyor musunuz?", [
             { text: "İptal", style: "cancel" },
-            { text: "Çıkış Yap", style: "destructive", onPress: async () => { await logout(); router.replace("/(auth)/login"); } },
+            { text: "Çıkış Yap", style: "destructive", onPress: async () => { await logout(); router.replace("/"); } },
           ])
         }
         activeOpacity={0.8}

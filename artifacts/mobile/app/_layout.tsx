@@ -6,7 +6,7 @@ import {
   useFonts,
 } from "@expo-google-fonts/inter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Stack } from "expo-router";
+import { Stack, useRouter, useSegments } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
@@ -15,7 +15,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { setBaseUrl } from "@workspace/api-client-react";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
-import { AuthProvider } from "@/context/AuthContext";
+import { AuthProvider, useAuth } from "@/context/AuthContext";
 
 // Set the API base URL from the environment
 setBaseUrl(`https://${process.env.EXPO_PUBLIC_DOMAIN}`);
@@ -31,22 +31,49 @@ const queryClient = new QueryClient({
   },
 });
 
+function AuthGuard() {
+  const { user, isLoading } = useAuth();
+  const segments = useSegments();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (isLoading) return;
+
+    const inAuthGroup = segments[0] === "(auth)";
+
+    if (!user && !inAuthGroup) {
+      router.replace("/(auth)/login");
+    } else if (user && inAuthGroup) {
+      if (user.role === "barber") {
+        router.replace("/(barber)");
+      } else {
+        router.replace("/(customer)");
+      }
+    }
+  }, [user, isLoading, segments]);
+
+  return null;
+}
+
 function RootLayoutNav() {
   return (
-    <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="index" />
-      <Stack.Screen name="(auth)" />
-      <Stack.Screen name="(barber)" />
-      <Stack.Screen name="(customer)" />
-      <Stack.Screen
-        name="book/[barberId]"
-        options={{ headerShown: true, title: "Randevu Al", headerBackTitle: "Geri" }}
-      />
-      <Stack.Screen
-        name="appointment/[id]"
-        options={{ headerShown: true, title: "Randevu Detayı", headerBackTitle: "Geri" }}
-      />
-    </Stack>
+    <>
+      <AuthGuard />
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="index" />
+        <Stack.Screen name="(auth)" />
+        <Stack.Screen name="(barber)" />
+        <Stack.Screen name="(customer)" />
+        <Stack.Screen
+          name="book/[barberId]"
+          options={{ headerShown: true, title: "Randevu Al", headerBackTitle: "Geri" }}
+        />
+        <Stack.Screen
+          name="appointment/[id]"
+          options={{ headerShown: true, title: "Randevu Detayı", headerBackTitle: "Geri" }}
+        />
+      </Stack>
+    </>
   );
 }
 
