@@ -15,7 +15,7 @@ import {
   customersTable,
   noShowBlocksTable,
 } from "@workspace/db";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and, sql, inArray } from "drizzle-orm";
 import {
   authenticate,
   requireBarber,
@@ -388,7 +388,77 @@ router.post(
         }
       }
 
-      // Skip open days that already have slots — never overwrite
+      if (hasTemplate) {
+        // ── Template sync for open day ─────────────────────────────────────
+        // 1. Delete unbooked slots whose startTime is NOT in the template
+        // 2. Insert template slots that are missing
+        // 3. Never touch booked slots
+        const tmpl = templateMap.get(dayOfWeek)!; // already confirmed isOpen above
+        const slotPairs = generateSlotPairs(tmpl.startTime, tmpl.endTime, tmpl.slotDuration);
+        const templateStartTimes = slotPairs.map((p) => p.startTime);
+
+        const existingSlots = await db
+          .select({
+            id: appointmentSlotsTable.id,
+            startTime: appointmentSlotsTable.startTime,
+            isBooked: appointmentSlotsTable.isBooked,
+          })
+          .from(appointmentSlotsTable)
+          .where(
+            and(
+              eq(appointmentSlotsTable.barberId, barber.id),
+              eq(appointmentSlotsTable.date, date),
+            ),
+          );
+
+        // Delete unbooked slots that are outside the new template
+        // Also guard against FK violations: exclude slots that have any appointment row
+        const candidateIds = existingSlots
+          .filter((s) => !s.isBooked && !templateStartTimes.includes(s.startTime))
+          .map((s) => s.id);
+
+        let toDelete: number[] = [];
+        if (candidateIds.length > 0) {
+          const referenced = await db
+            .select({ slotId: appointmentsTable.slotId })
+            .from(appointmentsTable)
+            .where(inArray(appointmentsTable.slotId, candidateIds));
+          const referencedIds = new Set(referenced.map((r) => r.slotId));
+          toDelete = candidateIds.filter((id) => !referencedIds.has(id));
+        }
+
+        if (toDelete.length > 0) {
+          await db
+            .delete(appointmentSlotsTable)
+            .where(inArray(appointmentSlotsTable.id, toDelete));
+        }
+
+        // Insert template slots that don't exist yet
+        const existingStartTimes = new Set(existingSlots.map((s) => s.startTime));
+        const toInsert = slotPairs
+          .filter((p) => !existingStartTimes.has(p.startTime))
+          .map((p) => ({
+            barberId: barber.id,
+            date,
+            startTime: p.startTime,
+            endTime: p.endTime,
+            isAvailable: true,
+            isBooked: false,
+          }));
+        if (toInsert.length > 0) {
+          await db.insert(appointmentSlotsTable).values(toInsert);
+        }
+
+        totalInserted += toInsert.length;
+        summary[date] = { inserted: toInsert.length, skipped: false };
+        req.log.info(
+          { barberId: barber.id, date, inserted: toInsert.length, deleted: toDelete.length },
+          "seed-week: synced open day",
+        );
+        continue;
+      }
+
+      // ── No-template fallback: skip if any slots exist, else insert defaults ──
       const existing = await db
         .select({ id: appointmentSlotsTable.id })
         .from(appointmentSlotsTable)
@@ -402,27 +472,15 @@ router.post(
 
       if (existing.length > 0) {
         summary[date] = { inserted: 0, skipped: true };
-        req.log.info({ barberId: barber.id, date }, "seed-week: day has slots, skipped");
+        req.log.info({ barberId: barber.id, date }, "seed-week: no template, day has slots, skipped");
         continue;
       }
 
-      let slotPairs: Array<{ startTime: string; endTime: string }>;
-
-      if (!hasTemplate) {
-        // No template configured → use default 13-slot schedule
-        slotPairs = DEFAULT_HOURS.map((hour) => ({
-          startTime: `${String(hour).padStart(2, "0")}:00`,
-          endTime:   `${String(hour + 1).padStart(2, "0")}:00`,
-        }));
-        req.log.info({ barberId: barber.id, date, count: slotPairs.length }, "seed-week: no template, using default");
-      } else {
-        const tmpl = templateMap.get(dayOfWeek)!; // already confirmed isOpen above
-        slotPairs = generateSlotPairs(tmpl.startTime, tmpl.endTime, tmpl.slotDuration);
-        req.log.info(
-          { barberId: barber.id, date, dayOfWeek, count: slotPairs.length, template: tmpl },
-          "seed-week: using availability template",
-        );
-      }
+      const slotPairs = DEFAULT_HOURS.map((hour) => ({
+        startTime: `${String(hour).padStart(2, "0")}:00`,
+        endTime:   `${String(hour + 1).padStart(2, "0")}:00`,
+      }));
+      req.log.info({ barberId: barber.id, date, count: slotPairs.length }, "seed-week: no template, using default");
 
       if (slotPairs.length === 0) {
         summary[date] = { inserted: 0, skipped: false };
