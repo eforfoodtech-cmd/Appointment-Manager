@@ -204,7 +204,7 @@ export default function SlotsScreen() {
                 {slot.startTime}
               </Text>
               {slot.isBooked && (
-                <Feather name="check" size={12} color={c.primaryForeground} />
+                <Text style={styles.slotTagBooked}>Dolu</Text>
               )}
               {!slot.isAvailable && !slot.isBooked && (
                 <Feather name="lock" size={12} color={c.mutedForeground} />
@@ -325,6 +325,7 @@ const styles = StyleSheet.create({
   slotTime: { fontSize: 13, fontFamily: "Inter_600SemiBold", color: c.foreground },
   slotTimeBooked: { color: "#fff" },
   slotTimeClosed: { color: c.mutedForeground },
+  slotTagBooked: { fontSize: 10, fontFamily: "Inter_600SemiBold", color: "rgba(255,255,255,0.85)" },
   empty: { alignItems: "center", paddingVertical: 60, gap: 12 },
   emptyText: { fontSize: 15, fontFamily: "Inter_500Medium", color: c.mutedForeground },
   emptySubtext: { fontSize: 13, fontFamily: "Inter_400Regular", color: c.mutedForeground },

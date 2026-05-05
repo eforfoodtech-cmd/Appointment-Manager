@@ -90,9 +90,8 @@ export default function BookingScreen() {
     },
   });
 
-  const availableSlots = (slots ?? []).filter(
-    (s) => s.isAvailable && !s.isBooked,
-  );
+  // Show all barber-opened slots: available ones selectable, booked ones shown as "Dolu"
+  const displaySlots = (slots ?? []).filter((s) => s.isAvailable);
 
   const handleBook = () => {
     if (!selectedSlotId) {
@@ -175,14 +174,14 @@ export default function BookingScreen() {
 
         {slotsLoading ? (
           <ActivityIndicator style={{ marginTop: 24 }} color={c.primary} />
-        ) : !availableSlots.length ? (
+        ) : !displaySlots.length ? (
           <View style={styles.empty}>
             <Feather name="clock" size={36} color={c.border} />
             <Text style={styles.emptyText}>Bu gün için müsait saat yok</Text>
           </View>
         ) : (
           <FlatList
-            data={availableSlots}
+            data={displaySlots}
             keyExtractor={(s) => String(s.id)}
             numColumns={3}
             scrollEnabled={false}
@@ -190,18 +189,32 @@ export default function BookingScreen() {
             columnWrapperStyle={{ gap: 10 }}
             renderItem={({ item: slot }) => {
               const isSelected = slot.id === selectedSlotId;
+              const isBooked = slot.isBooked;
               return (
                 <TouchableOpacity
-                  style={[styles.slot, isSelected && styles.slotSelected]}
+                  style={[
+                    styles.slot,
+                    isBooked && styles.slotBooked,
+                    !isBooked && isSelected && styles.slotSelected,
+                  ]}
                   onPress={() => {
+                    if (isBooked) return;
                     setSelectedSlotId(isSelected ? null : slot.id);
                     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                   }}
-                  activeOpacity={0.7}
+                  activeOpacity={isBooked ? 1 : 0.7}
+                  disabled={isBooked}
                 >
-                  <Text style={[styles.slotTime, isSelected && styles.slotTimeSelected]}>
+                  <Text style={[
+                    styles.slotTime,
+                    isBooked && styles.slotTimeBooked,
+                    !isBooked && isSelected && styles.slotTimeSelected,
+                  ]}>
                     {slot.startTime}
                   </Text>
+                  {isBooked && (
+                    <Text style={styles.slotTagBooked}>Dolu</Text>
+                  )}
                 </TouchableOpacity>
               );
             }}
@@ -295,8 +308,11 @@ const styles = StyleSheet.create({
     borderColor: c.border,
   },
   slotSelected: { backgroundColor: c.primary, borderColor: c.primary },
+  slotBooked: { backgroundColor: "#FEF2F2", borderColor: "#FECACA" },
   slotTime: { fontSize: 13, fontFamily: "Inter_600SemiBold", color: c.foreground },
   slotTimeSelected: { color: "#fff" },
+  slotTimeBooked: { color: "#EF4444" },
+  slotTagBooked: { fontSize: 10, fontFamily: "Inter_600SemiBold", color: "#EF4444" },
   empty: { alignItems: "center", paddingVertical: 40, gap: 10 },
   emptyText: { fontSize: 14, fontFamily: "Inter_400Regular", color: c.mutedForeground },
   bookBtn: {
