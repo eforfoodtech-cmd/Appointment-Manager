@@ -199,6 +199,24 @@ export const SetMyAvailabilityResponse = zod.array(
 );
 
 /**
+ * @summary Seed or sync the next 7 days of slots from weekly availability
+ */
+export const SeedWeekSlotsResponse = zod.object({
+  ok: zod.boolean().optional(),
+  totalInserted: zod.number().optional(),
+  summary: zod
+    .record(
+      zod.string(),
+      zod.object({
+        inserted: zod.number().optional(),
+        skipped: zod.boolean().optional(),
+        closed: zod.boolean().optional(),
+      }),
+    )
+    .optional(),
+});
+
+/**
  * @summary Get available appointment slots for a barber on a date
  */
 export const GetBarberSlotsParams = zod.object({

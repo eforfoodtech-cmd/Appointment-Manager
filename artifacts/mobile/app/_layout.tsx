@@ -13,7 +13,7 @@ import { Platform } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
-import { setBaseUrl, customFetch } from "@workspace/api-client-react";
+import { setBaseUrl, useSeedWeekSlots } from "@workspace/api-client-react";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
@@ -36,16 +36,16 @@ const AUTH_PATHS = ["/login", "/register"];
 function BarberSeeder() {
   const { user, token } = useAuth();
   const seededRef = useRef(false);
+  const seedWeek = useSeedWeekSlots();
 
   useEffect(() => {
     if (user?.role === "barber" && token && !seededRef.current) {
       seededRef.current = true;
-      customFetch("/api/barbers/me/slots/seed-week", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-      }).catch(() => {});
+      seedWeek.mutate(undefined, {
+        onError: () => {},
+      });
     }
-  }, [user, token]);
+  }, [user, token, seedWeek]);
 
   return null;
 }

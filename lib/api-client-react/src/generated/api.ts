@@ -36,6 +36,7 @@ import type {
   Message,
   NoShowBlock,
   RegisterRequest,
+  SeedWeekSlots200,
   SendMessageRequest,
   UpdateAppointmentRequest,
   UpdateBarberRequest,
@@ -840,6 +841,87 @@ export const useSetMyAvailability = <
   TContext
 > => {
   return useMutation(getSetMyAvailabilityMutationOptions(options));
+};
+
+/**
+ * @summary Seed or sync the next 7 days of slots from weekly availability
+ */
+export const getSeedWeekSlotsUrl = () => {
+  return `/api/barbers/me/slots/seed-week`;
+};
+
+export const seedWeekSlots = async (
+  options?: RequestInit,
+): Promise<SeedWeekSlots200> => {
+  return customFetch<SeedWeekSlots200>(getSeedWeekSlotsUrl(), {
+    ...options,
+    method: "POST",
+  });
+};
+
+export const getSeedWeekSlotsMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof seedWeekSlots>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof seedWeekSlots>>,
+  TError,
+  void,
+  TContext
+> => {
+  const mutationKey = ["seedWeekSlots"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof seedWeekSlots>>,
+    void
+  > = () => {
+    return seedWeekSlots(requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type SeedWeekSlotsMutationResult = NonNullable<
+  Awaited<ReturnType<typeof seedWeekSlots>>
+>;
+
+export type SeedWeekSlotsMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Seed or sync the next 7 days of slots from weekly availability
+ */
+export const useSeedWeekSlots = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof seedWeekSlots>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof seedWeekSlots>>,
+  TError,
+  void,
+  TContext
+> => {
+  return useMutation(getSeedWeekSlotsMutationOptions(options));
 };
 
 /**

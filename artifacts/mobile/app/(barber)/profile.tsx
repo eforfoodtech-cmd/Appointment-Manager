@@ -27,7 +27,7 @@ import {
   getGetMyBarberProfileQueryKey,
   getListBlocksQueryKey,
   getGetMyAvailabilityQueryKey,
-  customFetch,
+  useSeedWeekSlots,
 } from "@workspace/api-client-react";
 import type { AvailabilityInput } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -62,6 +62,7 @@ export default function BarberProfile() {
   const { user, logout } = useAuth();
   const queryClient = useQueryClient();
   const { showToast, ToastComponent } = useToast();
+  const seedWeek = useSeedWeekSlots();
   const [editMode, setEditMode] = useState(false);
   const [scheduleEditing, setScheduleEditing] = useState(false);
 
@@ -123,15 +124,14 @@ export default function BarberProfile() {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: getGetMyAvailabilityQueryKey() });
         setScheduleEditing(false);
-        customFetch("/api/barbers/me/slots/seed-week", { method: "POST" })
-          .then(() =>
+        seedWeek.mutate(undefined, {
+          onSuccess: () =>
             queryClient.invalidateQueries({
               predicate: (q) =>
                 typeof q.queryKey[0] === "string" &&
                 (q.queryKey[0] as string).includes("/slots"),
             }),
-          )
-          .catch(() => {});
+        });
         showToast("Haftalık program kaydedildi", "success");
       },
       onError: (err: any) =>

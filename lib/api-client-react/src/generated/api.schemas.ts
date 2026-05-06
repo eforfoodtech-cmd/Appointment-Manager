@@ -229,6 +229,20 @@ export interface BarberDashboard {
   nextAppointment?: Appointment | null;
 }
 
+export type SeedWeekSlots200Summary = {
+  [key: string]: {
+    inserted?: number;
+    skipped?: boolean;
+    closed?: boolean;
+  };
+};
+
+export type SeedWeekSlots200 = {
+  ok?: boolean;
+  totalInserted?: number;
+  summary?: SeedWeekSlots200Summary;
+};
+
 export type GetBarberSlotsParams = {
   /**
    * Date in YYYY-MM-DD format

@@ -243,6 +243,37 @@ paths:
                 items:
                   $ref: "#/components/schemas/Availability"
 
+  /barbers/me/slots/seed-week:
+    post:
+      operationId: seedWeekSlots
+      tags: [availability]
+      summary: Seed or sync the next 7 days of slots from weekly availability
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Seed-week completed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  totalInserted:
+                    type: integer
+                  summary:
+                    type: object
+                    additionalProperties:
+                      type: object
+                      properties:
+                        inserted:
+                          type: integer
+                        skipped:
+                          type: boolean
+                        closed:
+                          type: boolean
+
   /barbers/{barberId}/slots:
     get:
       operationId: getBarberSlots

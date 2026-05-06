@@ -27,6 +27,8 @@ export * from "./message";
 export * from "./noShowBlock";
 export * from "./registerRequest";
 export * from "./registerRequestRole";
+export * from "./seedWeekSlots200";
+export * from "./seedWeekSlots200Summary";
 export * from "./sendMessageRequest";
 export * from "./slotAppointmentDetail";
 export * from "./updateAppointmentRequest";
