@@ -19,9 +19,11 @@ import {
   useGetAppointment,
   useUpdateAppointment,
   useCreateBlock,
+  getGetAppointmentQueryKey,
   getListAppointmentsQueryKey,
   getGetBarberDashboardQueryKey,
   getGetUpcomingAppointmentsQueryKey,
+  getGetBarberSlotsQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/context/AuthContext";
@@ -53,13 +55,14 @@ export default function AppointmentDetail() {
 
   /** Invalidate every query that shows appointment data. */
   const invalidateAll = () => {
-    // Prefix-based: catches all param variants
-    queryClient.invalidateQueries({ queryKey: ["/api/appointments"] });
     queryClient.invalidateQueries({ queryKey: getListAppointmentsQueryKey() });
-    queryClient.invalidateQueries({ queryKey: getGetBarberDashboardQueryKey() });
+    queryClient.invalidateQueries({ queryKey: getGetAppointmentQueryKey(apptId) });
     queryClient.invalidateQueries({ queryKey: getGetUpcomingAppointmentsQueryKey() });
-    // Remove the single-appointment cache entry so stale data doesn't flash
-    queryClient.removeQueries({ queryKey: [`/api/appointments/${apptId}`] });
+    queryClient.invalidateQueries({ queryKey: getGetBarberDashboardQueryKey({ date: appt!.date }) });
+    queryClient.invalidateQueries({
+      queryKey: getGetBarberSlotsQueryKey(appt!.barberId, { date: appt!.date }),
+    });
+    queryClient.removeQueries({ queryKey: getGetAppointmentQueryKey(apptId) });
   };
 
   const update = useUpdateAppointment({
@@ -77,7 +80,11 @@ export default function AppointmentDetail() {
   const createBlock = useCreateBlock({
     mutation: {
       onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: ["/api/barbers/me/blocks"] });
+        queryClient.invalidateQueries({
+          predicate: (q) =>
+            typeof q.queryKey[0] === "string" &&
+            (q.queryKey[0] as string).includes("/api/barbers/me/blocks"),
+        });
         // After blocking, also go back so the screen doesn't freeze
         goBack();
       },

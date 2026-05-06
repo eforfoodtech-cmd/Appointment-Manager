@@ -18,6 +18,7 @@ import { Feather } from "@expo/vector-icons";
 import {
   useGetBarberDashboard,
   useUpdateAppointment,
+  getGetBarberDashboardQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import colors from "@/constants/colors";
@@ -36,12 +37,15 @@ export default function BarberDashboard() {
 
   const { data, isLoading, refetch, isRefetching } = useGetBarberDashboard(
     { date },
-    { query: { queryKey: ["barber-dashboard", date] } },
+    { query: { queryKey: getGetBarberDashboardQueryKey({ date }) } },
   );
 
   const updateAppt = useUpdateAppointment({
     mutation: {
-      onSuccess: () => queryClient.invalidateQueries({ queryKey: ["barber-dashboard"] }),
+      onSuccess: () =>
+        queryClient.invalidateQueries({
+          queryKey: getGetBarberDashboardQueryKey({ date }),
+        }),
     },
   });
 

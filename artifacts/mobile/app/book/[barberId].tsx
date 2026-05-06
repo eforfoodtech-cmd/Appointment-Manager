@@ -78,7 +78,9 @@ export default function BookingScreen() {
         queryClient.invalidateQueries({
           queryKey: getGetUpcomingAppointmentsQueryKey(),
         });
-        queryClient.invalidateQueries({ queryKey: ["getBarberSlots"] });
+        queryClient.invalidateQueries({
+          queryKey: getGetBarberSlotsQueryKey(Number(barberId), { date: selectedDate }),
+        });
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         Alert.alert("Randevu Alındı", "Randevunuz başarıyla oluşturuldu!", [
           { text: "Tamam", onPress: () => router.back() },

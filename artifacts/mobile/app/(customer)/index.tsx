@@ -14,7 +14,11 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import { Feather } from "@expo/vector-icons";
-import { useGetUpcomingAppointments, useUpdateAppointment } from "@workspace/api-client-react";
+import {
+  getGetUpcomingAppointmentsQueryKey,
+  useGetUpcomingAppointments,
+  useUpdateAppointment,
+} from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/context/AuthContext";
 import { AppointmentCard } from "@/components/AppointmentCard";
@@ -31,7 +35,8 @@ export default function CustomerHome() {
 
   const cancelAppt = useUpdateAppointment({
     mutation: {
-      onSuccess: () => queryClient.invalidateQueries({ queryKey: ["getUpcomingAppointments"] }),
+      onSuccess: () =>
+        queryClient.invalidateQueries({ queryKey: getGetUpcomingAppointmentsQueryKey() }),
     },
   });
 

@@ -16,7 +16,11 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
-import { useListMessages, useSendMessage } from "@workspace/api-client-react";
+import {
+  getListMessagesQueryKey,
+  useListMessages,
+  useSendMessage,
+} from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/context/AuthContext";
 import colors from "@/constants/colors";
@@ -36,7 +40,7 @@ export default function BarberMessages() {
   const sendMessage = useSendMessage({
     mutation: {
       onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: ["listMessages"] });
+        queryClient.invalidateQueries({ queryKey: getListMessagesQueryKey() });
         setShowCompose(false);
         setContent("");
         setReceiverIds("");
