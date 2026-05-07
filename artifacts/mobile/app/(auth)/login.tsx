@@ -67,17 +67,20 @@ export default function LoginScreen() {
 
         <View style={styles.inputGroup}>
           <Text style={styles.label}>Telefon Numarası</Text>
-          <TextInput
-            style={styles.input}
-            value={phone}
-            onChangeText={(text) => setPhone(text.replace(/\D/g, "").slice(0, 10))}
-            placeholder="5551112233"
-            placeholderTextColor={colors.light.mutedForeground}
-            keyboardType="number-pad"
-            maxLength={10}
-            autoCapitalize="none"
-            autoComplete="tel"
-          />
+          <View style={styles.phoneInput}>
+            <Text style={styles.phonePrefix}>0</Text>
+            <TextInput
+              style={styles.phoneField}
+              value={phone}
+              onChangeText={(text) => setPhone(text.replace(/\D/g, "").slice(0, 10))}
+              placeholder="5551112233"
+              placeholderTextColor={colors.light.mutedForeground}
+              keyboardType="number-pad"
+              maxLength={10}
+              autoCapitalize="none"
+              autoComplete="tel"
+            />
+          </View>
         </View>
 
         <View style={styles.inputGroup}>
@@ -182,6 +185,28 @@ const styles = StyleSheet.create({
     color: c.foreground,
     borderWidth: 1,
     borderColor: c.border,
+  },
+  phoneInput: {
+    backgroundColor: c.secondary,
+    borderRadius: colors.radius,
+    borderWidth: 1,
+    borderColor: c.border,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+  },
+  phonePrefix: {
+    fontSize: 16,
+    fontFamily: "Inter_400Regular",
+    color: c.foreground,
+    paddingRight: 4,
+  },
+  phoneField: {
+    flex: 1,
+    paddingVertical: 14,
+    fontSize: 16,
+    fontFamily: "Inter_400Regular",
+    color: c.foreground,
   },
   button: {
     backgroundColor: c.primary,

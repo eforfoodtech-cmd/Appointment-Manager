@@ -109,15 +109,23 @@ export default function RegisterScreen() {
       </View>
 
       <Field label="Ad Soyad" value={name} onChangeText={setName} placeholder="Ali Yılmaz" />
-      <Field
-        label="Telefon Numarası"
-        value={phone}
-        onChangeText={(text) => setPhone(text.replace(/\D/g, "").slice(0, 10))}
-        placeholder="5551112233"
-        keyboardType="number-pad"
-        autoCapitalize="none"
-        maxLength={10}
-      />
+      <View style={styles.inputGroup}>
+        <Text style={styles.label}>Telefon Numarası</Text>
+        <View style={styles.phoneInput}>
+          <Text style={styles.phonePrefix}>0</Text>
+          <TextInput
+            style={styles.phoneField}
+            value={phone}
+            onChangeText={(text) => setPhone(text.replace(/\D/g, "").slice(0, 10))}
+            placeholder="5551112233"
+            placeholderTextColor={c.mutedForeground}
+            keyboardType="number-pad"
+            autoCapitalize="none"
+            maxLength={10}
+            autoComplete="tel"
+          />
+        </View>
+      </View>
       <Field label="Şifre" value={password} onChangeText={setPassword} placeholder="6 haneli şifre" secureTextEntry keyboardType="number-pad" maxLength={6} />
 
       {role === "barber" && (
@@ -200,6 +208,34 @@ const styles = StyleSheet.create({
   backText: { fontSize: 15, fontFamily: "Inter_500Medium", color: c.primary },
   title: { fontSize: 28, fontFamily: "Inter_700Bold", color: c.foreground },
   subtitle: { fontSize: 15, fontFamily: "Inter_400Regular", color: c.mutedForeground, marginBottom: 4 },
+  label: {
+    fontSize: 13,
+    fontFamily: "Inter_500Medium",
+    color: c.mutedForeground,
+  },
+  inputGroup: { gap: 6, marginBottom: 4 },
+  phoneInput: {
+    backgroundColor: c.card,
+    borderRadius: colors.radius,
+    borderWidth: 1,
+    borderColor: c.border,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+  },
+  phonePrefix: {
+    fontSize: 15,
+    fontFamily: "Inter_400Regular",
+    color: c.foreground,
+    paddingRight: 4,
+  },
+  phoneField: {
+    flex: 1,
+    paddingVertical: 13,
+    fontSize: 15,
+    fontFamily: "Inter_400Regular",
+    color: c.foreground,
+  },
   roleRow: { flexDirection: "row", gap: 12, marginBottom: 4 },
   roleBtn: {
     flex: 1,
