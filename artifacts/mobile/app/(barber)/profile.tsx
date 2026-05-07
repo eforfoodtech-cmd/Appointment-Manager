@@ -44,10 +44,45 @@ const DURATION_OPTIONS = [30, 45, 60, 90];
 const DEFAULT_TEMPLATE: AvailabilityInput[] = [0, 1, 2, 3, 4, 5, 6].map((d) => ({
   dayOfWeek: d,
   startTime: "10:00",
-  endTime: "22:00",
+  endTime: "23:00",
   isOpen: d >= 1 && d <= 6, // Mon–Sat open, Sun closed
   slotDuration: 60,
 }));
+
+/**
+ * Validates an HH:MM time string.
+ * @param t - time string
+ * @param allowMidnight - if true, "24:00" is accepted (end-of-day sentinel)
+ */
+function isValidTime(t: string, allowMidnight = false): boolean {
+  if (!/^\d{2}:\d{2}$/.test(t)) return false;
+  const [hStr, mStr] = t.split(":");
+  const h = parseInt(hStr!, 10);
+  const m = parseInt(mStr!, 10);
+  if (allowMidnight && h === 24 && m === 0) return true;
+  return h >= 0 && h <= 23 && m >= 0 && m <= 59;
+}
+
+function timeToMinutes(t: string): number {
+  const [hStr, mStr] = t.split(":");
+  return parseInt(hStr!, 10) * 60 + parseInt(mStr!, 10);
+}
+
+function validateSchedule(rows: DayRow[]): string | null {
+  const valid = [30, 45, 60, 90];
+  for (const row of rows) {
+    if (!row.isOpen) continue;
+    if (!isValidTime(row.startTime, false))
+      return `${DAY_NAMES[row.dayOfWeek]}: Başlangıç saati geçersiz (ÖR: 09:00)`;
+    if (!isValidTime(row.endTime, true))
+      return `${DAY_NAMES[row.dayOfWeek]}: Bitiş saati geçersiz (ÖR: 23:00 veya 24:00)`;
+    if (timeToMinutes(row.startTime) >= timeToMinutes(row.endTime))
+      return `${DAY_NAMES[row.dayOfWeek]}: Başlangıç saati bitiş saatinden önce olmalı`;
+    if (!valid.includes(row.slotDuration))
+      return `${DAY_NAMES[row.dayOfWeek]}: Slot süresi 30, 45, 60 veya 90 dk olmalı`;
+  }
+  return null;
+}
 
 type DayRow = {
   dayOfWeek: number;
@@ -169,6 +204,11 @@ export default function BarberProfile() {
   };
 
   const handleSaveSchedule = () => {
+    const err = validateSchedule(schedule);
+    if (err) {
+      showToast(err, "error");
+      return;
+    }
     setAvailability.mutate({
       data: schedule.map((row) => ({
         dayOfWeek: row.dayOfWeek,

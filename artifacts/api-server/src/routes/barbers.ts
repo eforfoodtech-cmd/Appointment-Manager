@@ -24,6 +24,25 @@ import {
 
 const router = Router();
 
+// ─── Validation helpers ───────────────────────────────────────────────────────
+const TIME_RE = /^\d{2}:\d{2}$/;
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const VALID_DURATIONS = [30, 45, 60, 90];
+
+function isValidTime(t: string, allowMidnight = false): boolean {
+  if (!TIME_RE.test(t)) return false;
+  const [hStr, mStr] = t.split(":");
+  const h = parseInt(hStr!, 10);
+  const m = parseInt(mStr!, 10);
+  if (allowMidnight && h === 24 && m === 0) return true;
+  return h >= 0 && h <= 23 && m >= 0 && m <= 59;
+}
+
+function timeToMinutes(t: string): number {
+  const [hStr, mStr] = t.split(":");
+  return parseInt(hStr!, 10) * 60 + parseInt(mStr!, 10);
+}
+
 // ─── GET /api/barbers ─────────────────────────────────────────────────────────
 router.get("/", async (_req, res) => {
   const barbers = await db
@@ -184,6 +203,35 @@ router.put(
     if (!items || !Array.isArray(items) || items.length === 0) {
       res.json([]);
       return;
+    }
+
+    // Validate each row
+    for (const item of items) {
+      if (typeof item.dayOfWeek !== "number" || item.dayOfWeek < 0 || item.dayOfWeek > 6) {
+        res.status(400).json({ error: `Geçersiz dayOfWeek: ${item.dayOfWeek}. 0–6 arasında olmalı.` });
+        return;
+      }
+      if (typeof item.isOpen !== "boolean") {
+        res.status(400).json({ error: `dayOfWeek ${item.dayOfWeek}: isOpen boolean olmalı.` });
+        return;
+      }
+      if (!item.isOpen) continue; // closed days don't need time validation
+      if (!isValidTime(item.startTime, false)) {
+        res.status(400).json({ error: `dayOfWeek ${item.dayOfWeek}: Başlangıç saati geçersiz (ÖR: 09:00). 00:00–23:59 arası olmalı.` });
+        return;
+      }
+      if (!isValidTime(item.endTime, true)) {
+        res.status(400).json({ error: `dayOfWeek ${item.dayOfWeek}: Bitiş saati geçersiz (ÖR: 23:00 veya 24:00). 00:01–24:00 arası olmalı.` });
+        return;
+      }
+      if (timeToMinutes(item.startTime) >= timeToMinutes(item.endTime)) {
+        res.status(400).json({ error: `dayOfWeek ${item.dayOfWeek}: Başlangıç saati bitiş saatinden önce olmalı.` });
+        return;
+      }
+      if (!VALID_DURATIONS.includes(item.slotDuration)) {
+        res.status(400).json({ error: `dayOfWeek ${item.dayOfWeek}: Slot süresi 30, 45, 60 veya 90 dk olmalı.` });
+        return;
+      }
     }
 
     const inserted = await db
@@ -529,6 +577,22 @@ router.post(
       res.status(400).json({ error: "date, startTime ve endTime zorunludur" });
       return;
     }
+    if (!DATE_RE.test(date)) {
+      res.status(400).json({ error: "date geçersiz. YYYY-MM-DD formatında olmalı." });
+      return;
+    }
+    if (!isValidTime(startTime, false)) {
+      res.status(400).json({ error: "startTime geçersiz (ÖR: 09:00). 00:00–23:59 arası olmalı." });
+      return;
+    }
+    if (!isValidTime(endTime, true)) {
+      res.status(400).json({ error: "endTime geçersiz (ÖR: 10:00 veya 24:00). 00:01–24:00 arası olmalı." });
+      return;
+    }
+    if (timeToMinutes(startTime) >= timeToMinutes(endTime)) {
+      res.status(400).json({ error: "startTime endTime'dan önce olmalı." });
+      return;
+    }
 
     const [slot] = await db
       .insert(appointmentSlotsTable)
@@ -565,6 +629,11 @@ router.patch(
 
     const slotId = Number(req.params["slotId"]);
     const { isAvailable } = req.body;
+
+    if (typeof isAvailable !== "boolean") {
+      res.status(400).json({ error: "isAvailable boolean (true/false) olmalı." });
+      return;
+    }
 
     const [updated] = await db
       .update(appointmentSlotsTable)

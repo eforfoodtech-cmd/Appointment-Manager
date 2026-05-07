@@ -287,7 +287,30 @@ export default function SlotsScreen() {
   };
 
   const handleCreateSlot = () => {
-    if (!startTime || !endTime) return;
+    const isValidTime = (t: string, allowMidnight: boolean) => {
+      if (!/^\d{2}:\d{2}$/.test(t)) return false;
+      const [hStr, mStr] = t.split(":");
+      const h = parseInt(hStr!, 10);
+      const m = parseInt(mStr!, 10);
+      if (allowMidnight && h === 24 && m === 0) return true;
+      return h >= 0 && h <= 23 && m >= 0 && m <= 59;
+    };
+    const toMin = (t: string) => {
+      const [h, m] = t.split(":").map(Number);
+      return h! * 60 + m!;
+    };
+    if (!isValidTime(startTime, false)) {
+      showToast("Başlangıç saati geçersiz (ÖR: 09:00)", "error");
+      return;
+    }
+    if (!isValidTime(endTime, true)) {
+      showToast("Bitiş saati geçersiz (ÖR: 10:00 veya 24:00)", "error");
+      return;
+    }
+    if (toMin(startTime) >= toMin(endTime)) {
+      showToast("Başlangıç saati bitiş saatinden önce olmalı", "error");
+      return;
+    }
     createSlot.mutate({
       data: { date: selectedDate, startTime, endTime, isAvailable: true },
     });
