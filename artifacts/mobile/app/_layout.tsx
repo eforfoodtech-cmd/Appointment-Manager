@@ -6,7 +6,7 @@ import {
   useFonts,
 } from "@expo-google-fonts/inter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Stack, useRouter, usePathname } from "expo-router";
+import { Stack, useRouter, usePathname, useSegments } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect, useRef } from "react";
 import { Platform } from "react-native";
@@ -65,11 +65,13 @@ function BarberSeeder() {
 function AuthGuard() {
   const { user, isLoading } = useAuth();
   const pathname = usePathname();
+  const segments = useSegments();
   const router = useRouter();
 
   useEffect(() => {
     if (isLoading) return;
 
+    const routeGroup = segments[0];
     const isAuthScreen = AUTH_PATHS.some((p) => pathname === p || pathname.endsWith(p));
     const homePath = getHomePath(user?.role ?? null);
 
@@ -87,19 +89,19 @@ function AuthGuard() {
       return;
     }
 
-    if (user.role === "barber" && isCustomerOnlyPath(pathname)) {
+    if (user.role === "barber" && routeGroup === "(customer)") {
       if (pathname !== homePath) {
         router.replace(homePath);
       }
       return;
     }
 
-    if (user.role === "customer" && isBarberOnlyPath(pathname)) {
+    if (user.role === "customer" && routeGroup === "(barber)") {
       if (pathname !== homePath) {
         router.replace(homePath);
       }
     }
-  }, [user, isLoading, pathname, router]);
+  }, [user, isLoading, pathname, segments, router]);
 
   return null;
 }
