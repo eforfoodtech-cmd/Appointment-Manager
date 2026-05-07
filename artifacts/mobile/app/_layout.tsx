@@ -37,14 +37,6 @@ function getHomePath(role?: "barber" | "customer" | null) {
   return role === "barber" ? "/(barber)" : "/(customer)";
 }
 
-function isCustomerOnlyPath(pathname: string) {
-  return pathname.startsWith("/(customer)");
-}
-
-function isBarberOnlyPath(pathname: string) {
-  return pathname.startsWith("/(barber)");
-}
-
 function BarberSeeder() {
   const { user, token } = useAuth();
   const seededRef = useRef(false);
