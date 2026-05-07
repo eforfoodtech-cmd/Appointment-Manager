@@ -11,32 +11,23 @@ import { authenticate, createToken, type AuthRequest } from "../middlewares/auth
 
 const router = Router();
 const PIN_RE = /^\d{6}$/;
-const PHONE_RE = /^0\d{10}$/;
+const PHONE_RE = /^0[1-9]\d{9}$/;
 
 function normalizePhoneIdentifier(value: string) {
   const trimmed = value.trim();
-  if (!/^\d+$/.test(trimmed)) {
-    return "";
-  }
-  if (trimmed.length === 10 && !trimmed.startsWith("0")) {
-    return `0${trimmed}`;
-  }
-  if (PHONE_RE.test(trimmed)) {
-    return trimmed;
-  }
+  if (!/^\d+$/.test(trimmed)) return "";
+  if (/^[1-9]\d{9}$/.test(trimmed)) return `0${trimmed}`;
+  if (PHONE_RE.test(trimmed)) return trimmed;
   return "";
 }
 
 function normalizeLoginIdentifier(value: string) {
   const phone = normalizePhoneIdentifier(value);
-  if (phone) {
-    return { value: phone, isPhone: true };
-  }
-  const trimmed = value.trim().toLowerCase();
-  if (!trimmed) {
-    return { value: "", isPhone: false };
-  }
-  return { value: trimmed, isPhone: false };
+  if (phone) return { value: phone, isPhone: true };
+  const trimmed = value.trim();
+  if (!trimmed) return { value: "", isPhone: false };
+  if (trimmed.includes("@")) return { value: trimmed.toLowerCase(), isPhone: false };
+  return { value: "", isPhone: false };
 }
 
 function normalizeText(value?: string | null) {
