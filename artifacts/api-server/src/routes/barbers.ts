@@ -609,6 +609,23 @@ router.post(
       return;
     }
 
+    const [existingSlot] = await db
+      .select({ id: appointmentSlotsTable.id })
+      .from(appointmentSlotsTable)
+      .where(
+        and(
+          eq(appointmentSlotsTable.barberId, barber.id),
+          eq(appointmentSlotsTable.date, date),
+          eq(appointmentSlotsTable.startTime, startTime),
+        ),
+      )
+      .limit(1);
+
+    if (existingSlot) {
+      res.status(400).json({ error: "Bu tarih ve saatte zaten slot var" });
+      return;
+    }
+
     const [slot] = await db
       .insert(appointmentSlotsTable)
       .values({
