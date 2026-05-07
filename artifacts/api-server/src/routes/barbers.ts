@@ -15,7 +15,7 @@ import {
   customersTable,
   noShowBlocksTable,
 } from "@workspace/db";
-import { eq, and, sql, inArray } from "drizzle-orm";
+import { eq, and, sql, inArray, or, isNull, gt } from "drizzle-orm";
 import {
   authenticate,
   requireBarber,
@@ -804,6 +804,39 @@ router.post(
       return;
     }
 
+    const [customer] = await db
+      .select({ name: usersTable.name, phone: usersTable.phone })
+      .from(customersTable)
+      .innerJoin(usersTable, eq(usersTable.id, customersTable.userId))
+      .where(eq(customersTable.id, customerId))
+      .limit(1);
+
+    if (!customer) {
+      res.status(404).json({ error: "Müşteri bulunamadı" });
+      return;
+    }
+
+    const now = new Date();
+    const [existingBlock] = await db
+      .select({ id: noShowBlocksTable.id })
+      .from(noShowBlocksTable)
+      .where(
+        and(
+          eq(noShowBlocksTable.barberId, barber.id),
+          eq(noShowBlocksTable.customerId, customerId),
+          or(
+            isNull(noShowBlocksTable.expiresAt),
+            gt(noShowBlocksTable.expiresAt, now),
+          ),
+        ),
+      )
+      .limit(1);
+
+    if (existingBlock) {
+      res.status(400).json({ error: "Bu müşteri zaten engellenmiş" });
+      return;
+    }
+
     const [block] = await db
       .insert(noShowBlocksTable)
       .values({
@@ -814,17 +847,10 @@ router.post(
       })
       .returning();
 
-    const [customer] = await db
-      .select({ name: usersTable.name, phone: usersTable.phone })
-      .from(customersTable)
-      .innerJoin(usersTable, eq(usersTable.id, customersTable.userId))
-      .where(eq(customersTable.id, customerId))
-      .limit(1);
-
     res.status(201).json({
       ...block,
-      customerName: customer?.name || "",
-      customerPhone: customer?.phone || null,
+      customerName: customer.name || "",
+      customerPhone: customer.phone || null,
     });
   },
 );
