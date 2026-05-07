@@ -24,7 +24,6 @@ export default function RegisterScreen() {
   const { setAuth } = useAuth();
   const [role, setRole] = useState<Role>("customer");
   const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [shopName, setShopName] = useState("");
@@ -47,8 +46,8 @@ export default function RegisterScreen() {
   });
 
   const handleRegister = () => {
-    if (!name.trim() || !email.trim() || !password.trim()) {
-      Alert.alert("Hata", "Ad, e-posta ve şifre zorunludur");
+    if (!name.trim() || phone.length !== 10 || !password.trim()) {
+      Alert.alert("Hata", "Telefon numarası 10 haneli olmalı");
       return;
     }
     if (!PIN_RE.test(password)) {
@@ -63,9 +62,9 @@ export default function RegisterScreen() {
     registerMutation.mutate({
       data: {
         name: name.trim(),
-        email: email.trim(),
+        email: `0${phone}`,
         password,
-        phone: phone.trim() || undefined,
+        phone: `0${phone}`,
         role,
         ...(role === "barber" && {
           shopName: shopName.trim(),
@@ -110,8 +109,15 @@ export default function RegisterScreen() {
       </View>
 
       <Field label="Ad Soyad" value={name} onChangeText={setName} placeholder="Ali Yılmaz" />
-      <Field label="E-posta" value={email} onChangeText={setEmail} placeholder="ali@email.com" keyboardType="email-address" autoCapitalize="none" />
-      <Field label="Telefon (isteğe bağlı)" value={phone} onChangeText={setPhone} placeholder="05XX XXX XX XX" keyboardType="phone-pad" />
+      <Field
+        label="Telefon Numarası"
+        value={phone}
+        onChangeText={(text) => setPhone(text.replace(/\D/g, "").slice(0, 10))}
+        placeholder="5551112233"
+        keyboardType="number-pad"
+        autoCapitalize="none"
+        maxLength={10}
+      />
       <Field label="Şifre" value={password} onChangeText={setPassword} placeholder="6 haneli şifre" secureTextEntry keyboardType="number-pad" maxLength={6} />
 
       {role === "barber" && (

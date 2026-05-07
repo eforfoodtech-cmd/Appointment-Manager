@@ -21,7 +21,7 @@ const PIN_RE = /^\d{6}$/;
 export default function LoginScreen() {
   const insets = useSafeAreaInsets();
   const { setAuth } = useAuth();
-  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
 
   const loginMutation = useLogin({
@@ -41,15 +41,15 @@ export default function LoginScreen() {
   });
 
   const handleLogin = () => {
-    if (!email.trim() || !password.trim()) {
-      Alert.alert("Hata", "E-posta ve şifre zorunludur");
+    if (phone.length !== 10) {
+      Alert.alert("Hata", "Telefon numarası 10 haneli olmalı");
       return;
     }
     if (!PIN_RE.test(password)) {
       Alert.alert("Hata", "Şifre 6 haneli rakamlardan oluşmalı");
       return;
     }
-    loginMutation.mutate({ data: { email: email.trim(), password } });
+    loginMutation.mutate({ data: { email: `0${phone}`, password } });
   };
 
   return (
@@ -66,16 +66,17 @@ export default function LoginScreen() {
         <Text style={styles.title}>Giriş Yap</Text>
 
         <View style={styles.inputGroup}>
-          <Text style={styles.label}>E-posta</Text>
+          <Text style={styles.label}>Telefon Numarası</Text>
           <TextInput
             style={styles.input}
-            value={email}
-            onChangeText={setEmail}
-            placeholder="ornek@email.com"
+            value={phone}
+            onChangeText={(text) => setPhone(text.replace(/\D/g, "").slice(0, 10))}
+            placeholder="5551112233"
             placeholderTextColor={colors.light.mutedForeground}
-            keyboardType="email-address"
+            keyboardType="number-pad"
+            maxLength={10}
             autoCapitalize="none"
-            autoComplete="email"
+            autoComplete="tel"
           />
         </View>
 

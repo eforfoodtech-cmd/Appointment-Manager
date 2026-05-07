@@ -11,9 +11,21 @@ import { authenticate, createToken, type AuthRequest } from "../middlewares/auth
 
 const router = Router();
 const PIN_RE = /^\d{6}$/;
+const PHONE_RE = /^0\d{10}$/;
 
-function normalizeEmail(value: string) {
-  return value.trim().toLowerCase();
+function normalizeIdentifier(value: string) {
+  return value.trim().replace(/\D/g, "");
+}
+
+function normalizePhoneIdentifier(value: string) {
+  const digits = normalizeIdentifier(value);
+  if (digits.length === 10) {
+    return `0${digits}`;
+  }
+  if (PHONE_RE.test(digits)) {
+    return digits;
+  }
+  return "";
 }
 
 function normalizeText(value?: string | null) {
@@ -24,14 +36,14 @@ function normalizeText(value?: string | null) {
 // POST /api/auth/register
 router.post("/register", async (req, res) => {
   const { email, password, name, phone, role, shopName, shopAddress } = req.body;
-  const normalizedEmail = typeof email === "string" ? normalizeEmail(email) : "";
+  const normalizedEmail = typeof email === "string" ? normalizePhoneIdentifier(email) : "";
   const normalizedName = typeof name === "string" ? name.trim() : "";
-  const normalizedPhone = typeof phone === "string" ? normalizeText(phone) : null;
+  const normalizedPhone = typeof phone === "string" ? normalizePhoneIdentifier(phone) : "";
   const normalizedShopName = typeof shopName === "string" ? shopName.trim() : "";
   const normalizedShopAddress = typeof shopAddress === "string" ? normalizeText(shopAddress) : null;
 
   if (!normalizedEmail || !password || !normalizedName || !role) {
-    res.status(400).json({ error: "email, password, name ve role zorunludur" });
+    res.status(400).json({ error: "Telefon numarası 10 haneli olmalı" });
     return;
   }
 
@@ -42,6 +54,11 @@ router.post("/register", async (req, res) => {
 
   if (!PIN_RE.test(password)) {
     res.status(400).json({ error: "Şifre 6 haneli rakamlardan oluşmalı" });
+    return;
+  }
+
+  if (!PHONE_RE.test(normalizedEmail)) {
+    res.status(400).json({ error: "Telefon numarası 10 haneli olmalı" });
     return;
   }
 
@@ -113,10 +130,11 @@ router.post("/register", async (req, res) => {
 // POST /api/auth/login
 router.post("/login", async (req, res) => {
   const { email, password } = req.body;
-  const normalizedEmail = typeof email === "string" ? normalizeEmail(email) : "";
+  const rawEmail = typeof email === "string" ? email : "";
+  const normalizedEmail = normalizePhoneIdentifier(rawEmail) || rawEmail.trim().toLowerCase();
 
   if (!normalizedEmail || !password) {
-    res.status(400).json({ error: "email ve password zorunludur" });
+    res.status(400).json({ error: "Telefon numarası 10 haneli olmalı" });
     return;
   }
 
