@@ -33,6 +33,18 @@ const queryClient = new QueryClient({
 
 const AUTH_PATHS = ["/login", "/register"];
 
+function getHomePath(role?: "barber" | "customer" | null) {
+  return role === "barber" ? "/(barber)" : "/(customer)";
+}
+
+function isCustomerOnlyPath(pathname: string) {
+  return pathname.startsWith("/(customer)");
+}
+
+function isBarberOnlyPath(pathname: string) {
+  return pathname.startsWith("/(barber)");
+}
+
 function BarberSeeder() {
   const { user, token } = useAuth();
   const seededRef = useRef(false);
@@ -59,15 +71,35 @@ function AuthGuard() {
     if (isLoading) return;
 
     const isAuthScreen = AUTH_PATHS.some((p) => pathname === p || pathname.endsWith(p));
+    const homePath = getHomePath(user?.role ?? null);
 
-    if (!user && !isAuthScreen) {
-      if (Platform.OS === "web") {
-        (window as Window & typeof globalThis).location.href = "/login";
-      } else {
+    if (!user) {
+      if (!isAuthScreen && pathname !== "/login") {
         router.replace("/login");
       }
+      return;
     }
-  }, [user, isLoading, pathname]);
+
+    if (isAuthScreen || pathname === "/login") {
+      if (pathname !== homePath) {
+        router.replace(homePath);
+      }
+      return;
+    }
+
+    if (user.role === "barber" && isCustomerOnlyPath(pathname)) {
+      if (pathname !== homePath) {
+        router.replace(homePath);
+      }
+      return;
+    }
+
+    if (user.role === "customer" && isBarberOnlyPath(pathname)) {
+      if (pathname !== homePath) {
+        router.replace(homePath);
+      }
+    }
+  }, [user, isLoading, pathname, router]);
 
   return null;
 }
