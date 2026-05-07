@@ -43,6 +43,40 @@ function timeToMinutes(t: string): number {
   return parseInt(hStr!, 10) * 60 + parseInt(mStr!, 10);
 }
 
+function normalizeDate(date: string): string | null {
+  if (!DATE_RE.test(date)) return null;
+  return date;
+}
+
+function isValidAvailabilityRow(item: {
+  dayOfWeek: number;
+  startTime: string;
+  endTime: string;
+  isOpen: boolean;
+  slotDuration: number;
+}): string | null {
+  if (typeof item.dayOfWeek !== "number" || item.dayOfWeek < 0 || item.dayOfWeek > 6) {
+    return `Geçersiz dayOfWeek: ${item.dayOfWeek}. 0–6 arasında olmalı.`;
+  }
+  if (typeof item.isOpen !== "boolean") {
+    return `dayOfWeek ${item.dayOfWeek}: isOpen boolean olmalı.`;
+  }
+  if (typeof item.slotDuration !== "number" || !VALID_DURATIONS.includes(item.slotDuration)) {
+    return `dayOfWeek ${item.dayOfWeek}: Slot süresi 30, 45, 60 veya 90 dk olmalı.`;
+  }
+  if (!item.isOpen) return null;
+  if (!isValidTime(item.startTime, false)) {
+    return `dayOfWeek ${item.dayOfWeek}: Başlangıç saati geçersiz (ÖR: 09:00). 00:00–23:59 arası olmalı.`;
+  }
+  if (!isValidTime(item.endTime, true)) {
+    return `dayOfWeek ${item.dayOfWeek}: Bitiş saati geçersiz (ÖR: 23:00 veya 24:00). 00:01–24:00 arası olmalı.`;
+  }
+  if (timeToMinutes(item.startTime) >= timeToMinutes(item.endTime)) {
+    return `dayOfWeek ${item.dayOfWeek}: Başlangıç saati bitiş saatinden önce olmalı.`;
+  }
+  return null;
+}
+
 // ─── GET /api/barbers ─────────────────────────────────────────────────────────
 router.get("/", async (_req, res) => {
   const barbers = await db
@@ -187,11 +221,6 @@ router.put(
       return;
     }
 
-    // Replace all availability records with full upsert
-    await db
-      .delete(availabilityTable)
-      .where(eq(availabilityTable.barberId, barber.id));
-
     const items: Array<{
       dayOfWeek: number;
       startTime: string;
@@ -205,48 +234,32 @@ router.put(
       return;
     }
 
-    // Validate each row
     for (const item of items) {
-      if (typeof item.dayOfWeek !== "number" || item.dayOfWeek < 0 || item.dayOfWeek > 6) {
-        res.status(400).json({ error: `Geçersiz dayOfWeek: ${item.dayOfWeek}. 0–6 arasında olmalı.` });
+      const error = isValidAvailabilityRow(item);
+      if (error) {
+        res.status(400).json({ error });
         return;
       }
-      if (typeof item.isOpen !== "boolean") {
-        res.status(400).json({ error: `dayOfWeek ${item.dayOfWeek}: isOpen boolean olmalı.` });
-        return;
-      }
-      if (!item.isOpen) continue; // closed days don't need time validation
-      if (!isValidTime(item.startTime, false)) {
-        res.status(400).json({ error: `dayOfWeek ${item.dayOfWeek}: Başlangıç saati geçersiz (ÖR: 09:00). 00:00–23:59 arası olmalı.` });
-        return;
-      }
-      if (!isValidTime(item.endTime, true)) {
-        res.status(400).json({ error: `dayOfWeek ${item.dayOfWeek}: Bitiş saati geçersiz (ÖR: 23:00 veya 24:00). 00:01–24:00 arası olmalı.` });
-        return;
-      }
-      if (timeToMinutes(item.startTime) >= timeToMinutes(item.endTime)) {
-        res.status(400).json({ error: `dayOfWeek ${item.dayOfWeek}: Başlangıç saati bitiş saatinden önce olmalı.` });
-        return;
-      }
-      if (!VALID_DURATIONS.includes(item.slotDuration)) {
-        res.status(400).json({ error: `dayOfWeek ${item.dayOfWeek}: Slot süresi 30, 45, 60 veya 90 dk olmalı.` });
-        return;
-      }
+
+      if (!item.isOpen) continue;
     }
 
-    const inserted = await db
-      .insert(availabilityTable)
-      .values(
-        items.map((item) => ({
-          barberId: barber.id,
-          dayOfWeek: item.dayOfWeek,
-          startTime: item.startTime,
-          endTime: item.endTime,
-          isOpen: item.isOpen ?? true,
-          slotDuration: item.slotDuration ?? 60,
-        })),
-      )
-      .returning();
+    const inserted = await db.transaction(async (tx) => {
+      await tx.delete(availabilityTable).where(eq(availabilityTable.barberId, barber.id));
+      return tx
+        .insert(availabilityTable)
+        .values(
+          items.map((item) => ({
+            barberId: barber.id,
+            dayOfWeek: item.dayOfWeek,
+            startTime: item.startTime,
+            endTime: item.endTime,
+            isOpen: item.isOpen,
+            slotDuration: item.slotDuration,
+          })),
+        )
+        .returning();
+    });
 
     res.json(inserted);
   },
@@ -269,9 +282,11 @@ router.get(
       return;
     }
 
-    const date =
-      (req.query["date"] as string) ||
-      new Date().toISOString().split("T")[0];
+    const date = normalizeDate((req.query["date"] as string) || new Date().toISOString().split("T")[0]);
+    if (!date) {
+      res.status(400).json({ error: "date geçersiz. YYYY-MM-DD formatında olmalı." });
+      return;
+    }
 
     // Get today's appointments with full details
     const todayAppts = await db
@@ -673,34 +688,35 @@ router.delete(
     }
 
     const slotId = Number(req.params["slotId"]);
-
-    // Verify slot belongs to this barber and is not booked
-    const [slot] = await db
-      .select({ id: appointmentSlotsTable.id })
-      .from(appointmentSlotsTable)
-      .where(
-        and(
-          eq(appointmentSlotsTable.id, slotId),
-          eq(appointmentSlotsTable.barberId, barber.id),
-          eq(appointmentSlotsTable.isBooked, false),
-        ),
-      )
-      .limit(1);
-
-    if (!slot) {
-      res.status(404).json({ error: "Slot bulunamadı veya dolu slot silinemez" });
+    if (!Number.isInteger(slotId)) {
+      res.status(400).json({ error: "slotId geçersiz" });
       return;
     }
 
-    // Delete any cancelled/no_show appointments referencing this slot
-    // (active appointments are blocked by isBooked=false check above)
-    await db
-      .delete(appointmentsTable)
-      .where(eq(appointmentsTable.slotId, slotId));
+    const result = await db.transaction(async (tx) => {
+      const [slot] = await tx
+        .select({ id: appointmentSlotsTable.id })
+        .from(appointmentSlotsTable)
+        .where(
+          and(
+            eq(appointmentSlotsTable.id, slotId),
+            eq(appointmentSlotsTable.barberId, barber.id),
+            eq(appointmentSlotsTable.isBooked, false),
+          ),
+        )
+        .limit(1);
 
-    await db
-      .delete(appointmentSlotsTable)
-      .where(eq(appointmentSlotsTable.id, slotId));
+      if (!slot) return null;
+
+      await tx.delete(appointmentsTable).where(eq(appointmentsTable.slotId, slotId));
+      await tx.delete(appointmentSlotsTable).where(eq(appointmentSlotsTable.id, slotId));
+      return slot;
+    });
+
+    if (!result) {
+      res.status(404).json({ error: "Slot bulunamadı veya dolu slot silinemez" });
+      return;
+    }
 
     res.status(204).send();
   },

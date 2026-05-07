@@ -17,6 +17,22 @@ import { authenticate, type AuthRequest } from "../middlewares/auth";
 
 const router = Router();
 
+const TIME_RE = /^\d{2}:\d{2}$/;
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+function isValidDate(value: string): boolean {
+  return DATE_RE.test(value);
+}
+
+function isValidTime(value: string): boolean {
+  return TIME_RE.test(value);
+}
+
+function timeToMinutes(value: string): number {
+  const [hours, minutes] = value.split(":").map(Number);
+  return hours * 60 + minutes;
+}
+
 // Build enriched appointment response
 async function getAppointmentById(id: number) {
   const [appt] = await db
@@ -166,118 +182,126 @@ router.post("/", authenticate, async (req: AuthRequest, res) => {
     return;
   }
 
-  // Get slot
-  const [slot] = await db
-    .select()
-    .from(appointmentSlotsTable)
-    .where(eq(appointmentSlotsTable.id, slotId))
-    .limit(1);
-
-  if (!slot) {
-    res.status(404).json({ error: "Slot bulunamadı" });
-    return;
-  }
-
-  if (!slot.isAvailable || slot.isBooked) {
-    res.status(400).json({ error: "Bu slot müsait değil" });
-    return;
-  }
-
-  let customerId: number;
-
-  if (user.role === "barber" && manualCustomerId) {
-    // Barber booking on behalf of a customer
-    customerId = manualCustomerId;
-  } else if (user.role === "customer") {
-    // Customer booking for themselves
-    const [customer] = await db
-      .select({ id: customersTable.id })
-      .from(customersTable)
-      .where(eq(customersTable.userId, user.id))
+  const result = await db.transaction(async (tx) => {
+    const [slot] = await tx
+      .select()
+      .from(appointmentSlotsTable)
+      .where(eq(appointmentSlotsTable.id, slotId))
       .limit(1);
 
-    if (!customer) {
-      res.status(404).json({ error: "Müşteri profili bulunamadı" });
-      return;
-    }
-    customerId = customer.id;
+    if (!slot) return { status: 404 as const, error: "Slot bulunamadı" };
 
-    // Check if customer is blocked by this barber
-    const activeBlocks = await db
-      .select()
-      .from(noShowBlocksTable)
-      .where(
-        and(
-          eq(noShowBlocksTable.barberId, slot.barberId),
-          eq(noShowBlocksTable.customerId, customerId),
-        ),
+    if (!slot.isAvailable || slot.isBooked) {
+      return { status: 400 as const, error: "Bu slot müsait değil" };
+    }
+
+    let customerId: number;
+
+    if (user.role === "barber" && manualCustomerId) {
+      customerId = manualCustomerId;
+    } else if (user.role === "customer") {
+      const [customer] = await tx
+        .select({ id: customersTable.id })
+        .from(customersTable)
+        .where(eq(customersTable.userId, user.id))
+        .limit(1);
+
+      if (!customer) {
+        return { status: 404 as const, error: "Müşteri profili bulunamadı" };
+      }
+      customerId = customer.id;
+
+      const activeBlocks = await tx
+        .select()
+        .from(noShowBlocksTable)
+        .where(
+          and(
+            eq(noShowBlocksTable.barberId, slot.barberId),
+            eq(noShowBlocksTable.customerId, customerId),
+          ),
+        );
+
+      const now = new Date();
+      const isBlocked = activeBlocks.some(
+        (b) => !b.expiresAt || new Date(b.expiresAt) > now,
       );
 
-    const now = new Date();
-    const isBlocked = activeBlocks.some(
-      (b) => !b.expiresAt || new Date(b.expiresAt) > now,
-    );
+      if (isBlocked) {
+        return {
+          status: 400 as const,
+          error: "No-show nedeniyle bu berberden randevu alamazsınız",
+        };
+      }
 
-    if (isBlocked) {
-      res.status(400).json({
-        error: "No-show nedeniyle bu berberden randevu alamazsınız",
-      });
-      return;
+      const todayDate = new Date().toISOString().split("T")[0]!;
+      const limitDate = new Date(Date.now() + 6 * 24 * 60 * 60 * 1000)
+        .toISOString()
+        .split("T")[0]!;
+
+      const weeklyAppts = await tx
+        .select({ id: appointmentsTable.id })
+        .from(appointmentsTable)
+        .innerJoin(
+          appointmentSlotsTable,
+          eq(appointmentSlotsTable.id, appointmentsTable.slotId),
+        )
+        .where(
+          and(
+            eq(appointmentsTable.customerId, customerId),
+            not(inArray(appointmentsTable.status, ["cancelled"])),
+            gte(appointmentSlotsTable.date, todayDate),
+            lte(appointmentSlotsTable.date, limitDate),
+          ),
+        )
+        .limit(1);
+
+      if (weeklyAppts.length > 0) {
+        return {
+          status: 400 as const,
+          error:
+            "Bu hafta için zaten bir randevunuz var. Yeni randevu almak için mevcut randevunuzu iptal edin.",
+        };
+      }
+    } else {
+      return { status: 400 as const, error: "Geçersiz istek" };
     }
 
-    // ── Haftalık limit: bu 7 günlük pencerede zaten aktif randevu var mı? ──
-    const todayDate = new Date().toISOString().split("T")[0]!;
-    const limitDate = new Date(Date.now() + 6 * 24 * 60 * 60 * 1000)
-      .toISOString()
-      .split("T")[0]!;
+    const [appt] = await tx
+      .insert(appointmentsTable)
+      .values({
+        slotId,
+        barberId: slot.barberId,
+        customerId,
+        status: "confirmed",
+        notes: notes || null,
+      })
+      .returning();
 
-    const weeklyAppts = await db
-      .select({ id: appointmentsTable.id })
-      .from(appointmentsTable)
-      .innerJoin(
-        appointmentSlotsTable,
-        eq(appointmentSlotsTable.id, appointmentsTable.slotId),
-      )
+    const [updatedSlot] = await tx
+      .update(appointmentSlotsTable)
+      .set({ isBooked: true })
       .where(
         and(
-          eq(appointmentsTable.customerId, customerId),
-          not(inArray(appointmentsTable.status, ["cancelled"])),
-          gte(appointmentSlotsTable.date, todayDate),
-          lte(appointmentSlotsTable.date, limitDate),
+          eq(appointmentSlotsTable.id, slotId),
+          eq(appointmentSlotsTable.isAvailable, true),
+          eq(appointmentSlotsTable.isBooked, false),
         ),
       )
-      .limit(1);
+      .returning();
 
-    if (weeklyAppts.length > 0) {
-      res.status(400).json({
-        error:
-          "Bu hafta için zaten bir randevunuz var. Yeni randevu almak için mevcut randevunuzu iptal edin.",
-      });
-      return;
+    if (!updatedSlot) {
+      throw new Error("Bu slot müsait değil");
     }
-  } else {
-    res.status(400).json({ error: "Geçersiz istek" });
+
+    return { status: 201 as const, appointmentId: appt.id };
+  });
+
+  if ("error" in result) {
+    res.status(result.status).json({ error: result.error });
     return;
   }
 
-  // Mark slot as booked
-  await db
-    .update(appointmentSlotsTable)
-    .set({ isBooked: true })
-    .where(eq(appointmentSlotsTable.id, slotId));
-
-  const [appt] = await db
-    .insert(appointmentsTable)
-    .values({
-      slotId,
-      barberId: slot.barberId,
-      customerId,
-      status: "confirmed",
-      notes: notes || null,
-    })
-    .returning();
-
-  const enriched = await getAppointmentById(appt.id);
+  const enriched = await getAppointmentById(result.appointmentId);
   res.status(201).json(enriched);
 });
 
@@ -299,62 +323,93 @@ router.patch("/:id", authenticate, async (req: AuthRequest, res) => {
   const id = Number(req.params["id"]);
   const { status, slotId: newSlotId, notes } = req.body;
 
-  const [existing] = await db
-    .select()
-    .from(appointmentsTable)
-    .where(eq(appointmentsTable.id, id))
-    .limit(1);
-
-  if (!existing) {
-    res.status(404).json({ error: "Randevu bulunamadı" });
-    return;
-  }
-
-  const updates: Partial<typeof appointmentsTable.$inferInsert> = {};
-
-  if (status) updates.status = status;
-  if (notes !== undefined) updates.notes = notes;
-
-  // Rescheduling: move to a new slot
-  if (newSlotId && newSlotId !== existing.slotId) {
-    const [newSlot] = await db
+  const result = await db.transaction(async (tx) => {
+    const [existing] = await tx
       .select()
-      .from(appointmentSlotsTable)
-      .where(eq(appointmentSlotsTable.id, newSlotId))
+      .from(appointmentsTable)
+      .where(eq(appointmentsTable.id, id))
       .limit(1);
 
-    if (!newSlot || !newSlot.isAvailable || newSlot.isBooked) {
-      res.status(400).json({ error: "Seçilen slot müsait değil" });
-      return;
+    if (!existing) return { status: 404 as const, error: "Randevu bulunamadı" };
+
+    const updates: Partial<typeof appointmentsTable.$inferInsert> = {};
+    if (status) updates.status = status;
+    if (notes !== undefined) updates.notes = notes;
+
+    if (newSlotId && newSlotId !== existing.slotId) {
+      const [newSlot] = await tx
+        .select()
+        .from(appointmentSlotsTable)
+        .where(eq(appointmentSlotsTable.id, newSlotId))
+        .limit(1);
+
+      if (!newSlot || !newSlot.isAvailable || newSlot.isBooked) {
+        return { status: 400 as const, error: "Seçilen slot müsait değil" };
+      }
+
+      const [freedOld] = await tx
+        .update(appointmentSlotsTable)
+        .set({ isBooked: false })
+        .where(
+          and(
+            eq(appointmentSlotsTable.id, existing.slotId),
+            eq(appointmentSlotsTable.isBooked, true),
+          ),
+        )
+        .returning();
+
+      if (!freedOld) {
+        return { status: 400 as const, error: "Eski slot güncellenemedi" };
+      }
+
+      const [bookedNew] = await tx
+        .update(appointmentSlotsTable)
+        .set({ isBooked: true })
+        .where(
+          and(
+            eq(appointmentSlotsTable.id, newSlotId),
+            eq(appointmentSlotsTable.isAvailable, true),
+            eq(appointmentSlotsTable.isBooked, false),
+          ),
+        )
+        .returning();
+
+      if (!bookedNew) {
+        throw new Error("Seçilen slot müsait değil");
+      }
+
+      updates.slotId = newSlotId;
     }
 
-    // Free old slot
-    await db
-      .update(appointmentSlotsTable)
-      .set({ isBooked: false })
-      .where(eq(appointmentSlotsTable.id, existing.slotId));
+    if (status === "cancelled") {
+      const [freedOld] = await tx
+        .update(appointmentSlotsTable)
+        .set({ isBooked: false })
+        .where(
+          and(
+            eq(appointmentSlotsTable.id, existing.slotId),
+            eq(appointmentSlotsTable.isBooked, true),
+          ),
+        )
+        .returning();
 
-    // Book new slot
-    await db
-      .update(appointmentSlotsTable)
-      .set({ isBooked: true })
-      .where(eq(appointmentSlotsTable.id, newSlotId));
+      if (!freedOld) {
+        return { status: 400 as const, error: "İptal işlemi tamamlanamadı" };
+      }
+    }
 
-    updates.slotId = newSlotId;
+    await tx
+      .update(appointmentsTable)
+      .set(updates)
+      .where(eq(appointmentsTable.id, id));
+
+    return { status: 200 as const };
+  });
+
+  if ("error" in result) {
+    res.status(result.status).json({ error: result.error });
+    return;
   }
-
-  // If cancelling, free the slot
-  if (status === "cancelled") {
-    await db
-      .update(appointmentSlotsTable)
-      .set({ isBooked: false })
-      .where(eq(appointmentSlotsTable.id, existing.slotId));
-  }
-
-  await db
-    .update(appointmentsTable)
-    .set(updates)
-    .where(eq(appointmentsTable.id, id));
 
   const enriched = await getAppointmentById(id);
   res.json(enriched);
