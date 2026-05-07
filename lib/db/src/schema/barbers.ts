@@ -1,4 +1,4 @@
-import { pgTable, serial, integer, text, boolean, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, serial, integer, text, boolean, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { usersTable } from "./users";
@@ -11,7 +11,9 @@ export const barbersTable = pgTable("barbers", {
   bio: text("bio"),
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
-});
+}, (table) => ({
+  userUnique: uniqueIndex("barbers_user_id_unique").on(table.userId),
+}));
 
 export const insertBarberSchema = createInsertSchema(barbersTable).omit({
   id: true,

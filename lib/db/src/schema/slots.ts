@@ -1,4 +1,4 @@
-import { pgTable, serial, integer, text, boolean } from "drizzle-orm/pg-core";
+import { pgTable, serial, integer, text, boolean, uniqueIndex } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { barbersTable } from "./barbers";
@@ -11,7 +11,13 @@ export const appointmentSlotsTable = pgTable("appointment_slots", {
   endTime: text("end_time").notNull(), // HH:MM
   isAvailable: boolean("is_available").notNull().default(true),
   isBooked: boolean("is_booked").notNull().default(false),
-});
+}, (table) => ({
+  barberDateStartUnique: uniqueIndex("appointment_slots_barber_date_start_time_unique").on(
+    table.barberId,
+    table.date,
+    table.startTime,
+  ),
+}));
 
 export const insertSlotSchema = createInsertSchema(appointmentSlotsTable).omit({
   id: true,
