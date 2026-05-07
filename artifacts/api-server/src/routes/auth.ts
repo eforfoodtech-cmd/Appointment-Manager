@@ -10,12 +10,27 @@ import { eq } from "drizzle-orm";
 import { authenticate, createToken, type AuthRequest } from "../middlewares/auth";
 
 const router = Router();
+const PIN_RE = /^\d{6}$/;
+
+function normalizeEmail(value: string) {
+  return value.trim().toLowerCase();
+}
+
+function normalizeText(value?: string | null) {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : null;
+}
 
 // POST /api/auth/register
 router.post("/register", async (req, res) => {
   const { email, password, name, phone, role, shopName, shopAddress } = req.body;
+  const normalizedEmail = typeof email === "string" ? normalizeEmail(email) : "";
+  const normalizedName = typeof name === "string" ? name.trim() : "";
+  const normalizedPhone = typeof phone === "string" ? normalizeText(phone) : null;
+  const normalizedShopName = typeof shopName === "string" ? shopName.trim() : "";
+  const normalizedShopAddress = typeof shopAddress === "string" ? normalizeText(shopAddress) : null;
 
-  if (!email || !password || !name || !role) {
+  if (!normalizedEmail || !password || !normalizedName || !role) {
     res.status(400).json({ error: "email, password, name ve role zorunludur" });
     return;
   }
@@ -25,7 +40,12 @@ router.post("/register", async (req, res) => {
     return;
   }
 
-  if (role === "barber" && !shopName) {
+  if (!PIN_RE.test(password)) {
+    res.status(400).json({ error: "Şifre 6 haneli rakamlardan oluşmalı" });
+    return;
+  }
+
+  if (role === "barber" && !normalizedShopName) {
     res.status(400).json({ error: "Berber için işletme adı zorunludur" });
     return;
   }
@@ -34,7 +54,7 @@ router.post("/register", async (req, res) => {
   const existing = await db
     .select({ id: usersTable.id })
     .from(usersTable)
-    .where(eq(usersTable.email, email.toLowerCase()))
+    .where(eq(usersTable.email, normalizedEmail))
     .limit(1);
 
   if (existing.length > 0) {
@@ -44,28 +64,31 @@ router.post("/register", async (req, res) => {
 
   const passwordHash = await bcrypt.hash(password, 10);
 
-  const [user] = await db
-    .insert(usersTable)
-    .values({
-      email: email.toLowerCase(),
-      passwordHash,
-      name,
-      phone: phone || null,
-      role,
-    })
-    .returning();
+  const user = await db.transaction(async (tx) => {
+    const [insertedUser] = await tx
+      .insert(usersTable)
+      .values({
+        email: normalizedEmail,
+        passwordHash,
+        name: normalizedName,
+        phone: normalizedPhone,
+        role,
+      })
+      .returning();
 
-  // Create role-specific profile
-  if (role === "barber") {
-    await db.insert(barbersTable).values({
-      userId: user.id,
-      shopName,
-      shopAddress: shopAddress || null,
-      isActive: true,
-    });
-  } else {
-    await db.insert(customersTable).values({ userId: user.id });
-  }
+    if (role === "barber") {
+      await tx.insert(barbersTable).values({
+        userId: insertedUser.id,
+        shopName: normalizedShopName,
+        shopAddress: normalizedShopAddress,
+        isActive: true,
+      });
+    } else {
+      await tx.insert(customersTable).values({ userId: insertedUser.id });
+    }
+
+    return insertedUser;
+  });
 
   const token = createToken({
     id: user.id,
@@ -90,16 +113,22 @@ router.post("/register", async (req, res) => {
 // POST /api/auth/login
 router.post("/login", async (req, res) => {
   const { email, password } = req.body;
+  const normalizedEmail = typeof email === "string" ? normalizeEmail(email) : "";
 
-  if (!email || !password) {
+  if (!normalizedEmail || !password) {
     res.status(400).json({ error: "email ve password zorunludur" });
+    return;
+  }
+
+  if (!PIN_RE.test(password)) {
+    res.status(400).json({ error: "Şifre 6 haneli rakamlardan oluşmalı" });
     return;
   }
 
   const [user] = await db
     .select()
     .from(usersTable)
-    .where(eq(usersTable.email, email.toLowerCase()))
+    .where(eq(usersTable.email, normalizedEmail))
     .limit(1);
 
   if (!user) {

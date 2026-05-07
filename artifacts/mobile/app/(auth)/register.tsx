@@ -17,6 +17,7 @@ import { useAuth } from "@/context/AuthContext";
 import colors from "@/constants/colors";
 
 type Role = "barber" | "customer";
+const PIN_RE = /^\d{6}$/;
 
 export default function RegisterScreen() {
   const insets = useSafeAreaInsets();
@@ -48,6 +49,10 @@ export default function RegisterScreen() {
   const handleRegister = () => {
     if (!name.trim() || !email.trim() || !password.trim()) {
       Alert.alert("Hata", "Ad, e-posta ve şifre zorunludur");
+      return;
+    }
+    if (!PIN_RE.test(password)) {
+      Alert.alert("Hata", "Şifre 6 haneli rakamlardan oluşmalı");
       return;
     }
     if (role === "barber" && !shopName.trim()) {
@@ -107,7 +112,7 @@ export default function RegisterScreen() {
       <Field label="Ad Soyad" value={name} onChangeText={setName} placeholder="Ali Yılmaz" />
       <Field label="E-posta" value={email} onChangeText={setEmail} placeholder="ali@email.com" keyboardType="email-address" autoCapitalize="none" />
       <Field label="Telefon (isteğe bağlı)" value={phone} onChangeText={setPhone} placeholder="05XX XXX XX XX" keyboardType="phone-pad" />
-      <Field label="Şifre" value={password} onChangeText={setPassword} placeholder="En az 6 karakter" secureTextEntry />
+      <Field label="Şifre" value={password} onChangeText={setPassword} placeholder="6 haneli şifre" secureTextEntry keyboardType="number-pad" maxLength={6} />
 
       {role === "barber" && (
         <>
@@ -140,6 +145,7 @@ function Field({
   secureTextEntry,
   keyboardType,
   autoCapitalize,
+  maxLength,
 }: {
   label: string;
   value: string;
@@ -148,6 +154,7 @@ function Field({
   secureTextEntry?: boolean;
   keyboardType?: any;
   autoCapitalize?: any;
+  maxLength?: number;
 }) {
   const c = colors.light;
   return (
@@ -172,6 +179,7 @@ function Field({
         secureTextEntry={secureTextEntry}
         keyboardType={keyboardType}
         autoCapitalize={autoCapitalize || "words"}
+        maxLength={maxLength}
       />
     </View>
   );

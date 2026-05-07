@@ -16,6 +16,8 @@ import { useLogin } from "@workspace/api-client-react";
 import { useAuth } from "@/context/AuthContext";
 import colors from "@/constants/colors";
 
+const PIN_RE = /^\d{6}$/;
+
 export default function LoginScreen() {
   const insets = useSafeAreaInsets();
   const { setAuth } = useAuth();
@@ -41,6 +43,10 @@ export default function LoginScreen() {
   const handleLogin = () => {
     if (!email.trim() || !password.trim()) {
       Alert.alert("Hata", "E-posta ve şifre zorunludur");
+      return;
+    }
+    if (!PIN_RE.test(password)) {
+      Alert.alert("Hata", "Şifre 6 haneli rakamlardan oluşmalı");
       return;
     }
     loginMutation.mutate({ data: { email: email.trim(), password } });
@@ -79,9 +85,11 @@ export default function LoginScreen() {
             style={styles.input}
             value={password}
             onChangeText={setPassword}
-            placeholder="••••••"
+            placeholder="6 haneli şifre"
             placeholderTextColor={colors.light.mutedForeground}
             secureTextEntry
+            keyboardType="number-pad"
+            maxLength={6}
             autoComplete="password"
           />
         </View>
