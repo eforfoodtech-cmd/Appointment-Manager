@@ -13,19 +13,30 @@ const router = Router();
 const PIN_RE = /^\d{6}$/;
 const PHONE_RE = /^0\d{10}$/;
 
-function normalizeIdentifier(value: string) {
-  return value.trim().replace(/\D/g, "");
-}
-
 function normalizePhoneIdentifier(value: string) {
-  const digits = normalizeIdentifier(value);
-  if (digits.length === 10) {
-    return `0${digits}`;
+  const trimmed = value.trim();
+  if (!/^\d+$/.test(trimmed)) {
+    return "";
   }
-  if (PHONE_RE.test(digits)) {
-    return digits;
+  if (trimmed.length === 10 && !trimmed.startsWith("0")) {
+    return `0${trimmed}`;
+  }
+  if (PHONE_RE.test(trimmed)) {
+    return trimmed;
   }
   return "";
+}
+
+function normalizeLoginIdentifier(value: string) {
+  const phone = normalizePhoneIdentifier(value);
+  if (phone) {
+    return { value: phone, isPhone: true };
+  }
+  const trimmed = value.trim().toLowerCase();
+  if (!trimmed) {
+    return { value: "", isPhone: false };
+  }
+  return { value: trimmed, isPhone: false };
 }
 
 function normalizeText(value?: string | null) {
@@ -131,9 +142,9 @@ router.post("/register", async (req, res) => {
 router.post("/login", async (req, res) => {
   const { email, password } = req.body;
   const rawEmail = typeof email === "string" ? email : "";
-  const normalizedEmail = normalizePhoneIdentifier(rawEmail) || rawEmail.trim().toLowerCase();
+  const { value: normalizedEmail, isPhone } = normalizeLoginIdentifier(rawEmail);
 
-  if (!normalizedEmail || !password) {
+  if (!normalizedEmail || !password || (isPhone && !PHONE_RE.test(normalizedEmail))) {
     res.status(400).json({ error: "Telefon numarası 10 haneli olmalı" });
     return;
   }
