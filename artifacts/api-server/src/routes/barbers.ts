@@ -266,30 +266,29 @@ router.get(
       )
       .orderBy(appointmentSlotsTable.startTime);
 
-    const pendingCount = todayAppts.filter(
+    const activeAppts = todayAppts.filter(
       (a) => a.status === "pending" || a.status === "confirmed",
-    ).length;
-    const completedCount = todayAppts.filter(
-      (a) => a.status === "completed",
-    ).length;
-    const noShowCount = todayAppts.filter(
-      (a) => a.status === "no_show",
-    ).length;
+    );
+    const pendingCount = activeAppts.length;
+    const completedCount = todayAppts.filter((a) => a.status === "completed").length;
+    const noShowCount = todayAppts.filter((a) => a.status === "no_show").length;
+    const cancelledCount = todayAppts.filter((a) => a.status === "cancelled").length;
 
     const now = new Date().toTimeString().slice(0, 5);
     const nextAppt =
-      todayAppts.find(
+      activeAppts.find(
         (a) =>
           a.startTime > now &&
           (a.status === "confirmed" || a.status === "pending"),
       ) || null;
 
     res.json({
-      todayCount: todayAppts.length,
+      todayCount: activeAppts.length,
       pendingCount,
       completedCount,
       noShowCount,
-      todayAppointments: todayAppts,
+      cancelledCount,
+      todayAppointments: activeAppts,
       nextAppointment: nextAppt,
     });
   },
