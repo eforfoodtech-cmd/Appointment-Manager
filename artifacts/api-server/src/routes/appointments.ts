@@ -33,6 +33,16 @@ function timeToMinutes(value: string): number {
   return hours * 60 + minutes;
 }
 
+function getNowInIstanbul(): { date: string; minutesOfDay: number } {
+  const str = new Date().toLocaleString("sv-SE", { timeZone: "Europe/Istanbul" });
+  const [datePart, timePart] = str.split(" ");
+  const [hStr, mStr] = (timePart ?? "00:00").split(":");
+  return {
+    date: datePart ?? "",
+    minutesOfDay: parseInt(hStr ?? "0", 10) * 60 + parseInt(mStr ?? "0", 10),
+  };
+}
+
 // Build enriched appointment response
 async function getAppointmentById(id: number) {
   const [appt] = await db
@@ -193,6 +203,14 @@ router.post("/", authenticate, async (req: AuthRequest, res) => {
 
     if (!slot.isAvailable || slot.isBooked) {
       return { status: 400 as const, error: "Bu slot müsait değil" };
+    }
+
+    const { date: nowDate, minutesOfDay: nowMinutes } = getNowInIstanbul();
+    if (
+      slot.date < nowDate ||
+      (slot.date === nowDate && timeToMinutes(slot.startTime) <= nowMinutes)
+    ) {
+      return { status: 400 as const, error: "Bu randevu saati artık alınamaz" };
     }
 
     let customerId: number;

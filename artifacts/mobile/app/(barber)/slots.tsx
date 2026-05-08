@@ -59,6 +59,16 @@ function formatDay(dateStr: string) {
   };
 }
 
+function getNowIstanbul() {
+  const str = new Date().toLocaleString("sv-SE", { timeZone: "Europe/Istanbul" });
+  const [datePart, timePart] = str.split(" ");
+  const [hStr, mStr] = (timePart ?? "00:00").split(":");
+  return {
+    date: datePart ?? "",
+    minutes: parseInt(hStr ?? "0", 10) * 60 + parseInt(mStr ?? "0", 10),
+  };
+}
+
 const STATUS_LABELS: Record<string, string> = {
   pending: "Beklemede",
   confirmed: "Onaylandı",
@@ -341,6 +351,14 @@ export default function SlotsScreen() {
     }
   };
 
+  const { date: todayStr, minutes: nowMinutes } = getNowIstanbul();
+  const isPastSlot = (startTime: string) => {
+    if (selectedDate > todayStr) return false;
+    if (selectedDate < todayStr) return true;
+    const [h, m] = startTime.split(":").map(Number);
+    return (h ?? 0) * 60 + (m ?? 0) <= nowMinutes;
+  };
+
   const paddingTop = insets.top + (Platform.OS === "web" ? 67 : 0);
 
   return (
@@ -400,92 +418,103 @@ export default function SlotsScreen() {
               <Text style={styles.emptyText}>Bu gün için slot yok</Text>
             </View>
           }
-          renderItem={({ item: slot }) => (
-            <TouchableOpacity
-              activeOpacity={slot.isBooked ? 0.7 : 1}
-              onPress={() => handleSlotPress(slot)}
-              disabled={!slot.isBooked}
-            >
-              <View
-                style={[
-                  styles.slotRow,
-                  slot.isBooked && styles.slotRowBooked,
-                  !slot.isAvailable && !slot.isBooked && styles.slotRowClosed,
-                ]}
+          renderItem={({ item: slot }) => {
+            const isPast = isPastSlot(slot.startTime);
+            return (
+              <TouchableOpacity
+                activeOpacity={slot.isBooked ? 0.7 : 1}
+                onPress={() => handleSlotPress(slot)}
+                disabled={!slot.isBooked}
               >
-                {/* Time */}
-                <View style={styles.slotTimeCol}>
-                  <Text style={[
-                    styles.slotTime,
-                    slot.isBooked && styles.slotTimeBooked,
-                    !slot.isAvailable && !slot.isBooked && styles.slotTimeClosed,
-                  ]}>
-                    {slot.startTime}
-                  </Text>
-                  <Text style={[
-                    styles.slotEndTime,
-                    slot.isBooked && styles.slotTimeBooked,
-                    !slot.isAvailable && !slot.isBooked && styles.slotTimeClosed,
-                  ]}>
-                    {slot.endTime}
-                  </Text>
-                </View>
+                <View
+                  style={[
+                    styles.slotRow,
+                    slot.isBooked && !isPast && styles.slotRowBooked,
+                    slot.isBooked && isPast && styles.slotRowPastBooked,
+                    !slot.isBooked && !slot.isAvailable && styles.slotRowClosed,
+                    !slot.isBooked && isPast && styles.slotRowPast,
+                  ]}
+                >
+                  {/* Time */}
+                  <View style={styles.slotTimeCol}>
+                    <Text style={[
+                      styles.slotTime,
+                      slot.isBooked && !isPast && styles.slotTimeBooked,
+                      isPast && styles.slotTimePast,
+                    ]}>
+                      {slot.startTime}
+                    </Text>
+                    <Text style={[
+                      styles.slotEndTime,
+                      slot.isBooked && !isPast && styles.slotTimeBooked,
+                      isPast && styles.slotTimePast,
+                    ]}>
+                      {slot.endTime}
+                    </Text>
+                  </View>
 
-                {/* Status / customer */}
-                {slot.isBooked ? (
-                  <View style={styles.bookedInfo}>
-                    <View style={styles.badgeBooked}>
-                      <Text style={styles.badgeBookedText}>Dolu</Text>
+                  {/* Status / customer */}
+                  {slot.isBooked ? (
+                    <View style={styles.bookedInfo}>
+                      <View style={isPast ? styles.badgePast : styles.badgeBooked}>
+                        <Text style={isPast ? styles.badgePastText : styles.badgeBookedText}>
+                          {isPast ? "Başladı" : "Dolu"}
+                        </Text>
+                      </View>
+                      {slot.appointment && (
+                        <Text style={[styles.customerName, isPast && { color: c.mutedForeground }]} numberOfLines={1}>
+                          {slot.appointment.customerName}
+                        </Text>
+                      )}
                     </View>
-                    {slot.appointment && (
-                      <Text style={styles.customerName} numberOfLines={1}>
-                        {slot.appointment.customerName}
-                      </Text>
-                    )}
-                  </View>
-                ) : slot.isAvailable ? (
-                  <View style={styles.badgeOpen}>
-                    <Text style={styles.badgeOpenText}>Müsait</Text>
-                  </View>
-                ) : (
-                  <View style={styles.badgeClosed}>
-                    <Text style={styles.badgeClosedText}>Kapalı</Text>
-                  </View>
-                )}
+                  ) : isPast ? (
+                    <View style={styles.badgePast}>
+                      <Text style={styles.badgePastText}>Geçti</Text>
+                    </View>
+                  ) : slot.isAvailable ? (
+                    <View style={styles.badgeOpen}>
+                      <Text style={styles.badgeOpenText}>Müsait</Text>
+                    </View>
+                  ) : (
+                    <View style={styles.badgeClosed}>
+                      <Text style={styles.badgeClosedText}>Kapalı</Text>
+                    </View>
+                  )}
 
-                {/* Booked slot tap hint */}
-                {slot.isBooked && (
-                  <Feather name="chevron-right" size={16} color={c.primary} />
-                )}
+                  {/* Booked slot tap hint */}
+                  {slot.isBooked && (
+                    <Feather name="chevron-right" size={16} color={isPast ? c.mutedForeground : c.primary} />
+                  )}
 
-                {/* Actions for non-booked slots */}
-                {!slot.isBooked && (
-                  <View style={styles.slotActions}>
-                    <TouchableOpacity
-                      style={styles.iconBtn}
-                      onPress={() => handleToggle(slot.id, slot.isAvailable)}
-                      activeOpacity={0.7}
-                      disabled={updateSlot.isPending}
-                    >
-                      <Feather
-                        name={slot.isAvailable ? "eye" : "eye-off"}
-                        size={18}
-                        color={slot.isAvailable ? c.primary : c.mutedForeground}
-                      />
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={styles.iconBtn}
-                      onPress={() => handleDelete(slot.id)}
-                      activeOpacity={0.7}
-                      disabled={deleteSlot.isPending}
-                    >
-                      <Feather name="trash-2" size={18} color={c.destructive} />
-                    </TouchableOpacity>
-                  </View>
-                )}
-              </View>
-            </TouchableOpacity>
-          )}
+                  {/* Actions for non-booked slots */}
+                  {!slot.isBooked && (
+                    <View style={styles.slotActions}>
+                      <TouchableOpacity
+                        style={styles.iconBtn}
+                        onPress={() => handleToggle(slot.id, slot.isAvailable)}
+                        activeOpacity={0.7}
+                        disabled={updateSlot.isPending || isPast}
+                      >
+                        <Feather
+                          name={slot.isAvailable ? "eye" : "eye-off"}
+                          size={18}
+                          color={isPast ? c.border : (slot.isAvailable ? c.primary : c.mutedForeground)}
+                        />
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.iconBtn}
+                        onPress={() => handleDelete(slot.id)}
+                        activeOpacity={0.7}
+                        disabled={deleteSlot.isPending || isPast}
+                      >
+                        <Feather name="trash-2" size={18} color={isPast ? c.border : c.destructive} />
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                </View>
+              </TouchableOpacity>
+            );
+          }}
         />
       )}
 
@@ -614,12 +643,15 @@ const styles = StyleSheet.create({
   },
   slotRowBooked: { backgroundColor: c.primary + "18", borderColor: c.primary + "60" },
   slotRowClosed: { backgroundColor: c.secondary, opacity: 0.75 },
+  slotRowPast: { backgroundColor: "#F9FAFB", borderColor: "#E5E7EB", opacity: 0.75 },
+  slotRowPastBooked: { backgroundColor: "#F3F4F6", borderColor: "#E5E7EB" },
 
   slotTimeCol: { width: 56, flexShrink: 0 },
   slotTime: { fontSize: 15, fontFamily: "Inter_700Bold", color: c.foreground },
   slotEndTime: { fontSize: 12, fontFamily: "Inter_400Regular", color: c.mutedForeground, marginTop: 1 },
   slotTimeBooked: { color: c.primary },
   slotTimeClosed: { color: c.mutedForeground },
+  slotTimePast: { color: "#9CA3AF" },
 
   bookedInfo: { flex: 1, minWidth: 0, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 },
   customerName: {
@@ -649,6 +681,15 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   badgeBookedText: { fontSize: 12, fontFamily: "Inter_600SemiBold", color: c.primary },
+  badgePast: {
+    backgroundColor: "#F3F4F6",
+    borderRadius: 6,
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    alignSelf: "center" as const,
+    marginRight: 8,
+  },
+  badgePastText: { fontSize: 12, fontFamily: "Inter_600SemiBold", color: "#9CA3AF" },
   badgeClosed: {
     flex: 1,
     minWidth: 0,

@@ -1,0 +1,46 @@
+Slot geçmiş/başlamış durum mantığını düzelt.
+
+Sorun:
+Şu an müşteri tarafında 10:00–11:00 slotu saat 11:00 olana kadar alınabiliyor gibi davranıyor. Slotun “geçti” sayılması için endTime bekleniyor. Bu yanlış. Randevu alma açısından slot başlangıç saati geçtiyse artık alınamamalı. Ayrıca berber ekranında geçmiş/başlamış slotlar müşteri ekranıyla tutarlı görünmüyor.
+
+İstenen davranış:
+
+1. Müşteri tarafında:
+
+   * Bugünkü bir slot için startTime <= current time ise slot artık alınamaz.
+   * EndTime beklenmesin.
+   * Örnek: 10:00–11:00 slotu saat 10:01’de artık alınamaz.
+   * Böyle slotlar “Geçti” veya “Başladı” olarak gösterilsin.
+   * Dolu slotlar zaten alınamaz.
+
+2. Berber tarafında:
+
+   * Bugünkü slotlarda startTime <= current time ise slot görsel olarak “Geçti” veya “Başladı” gibi ayrı gösterilsin.
+   * Eğer slot dolu/randevuluysa müşteri bilgisi/telefon görüntüleme davranışı bozulmasın.
+   * Eğer slot boş ama geçmişse artık müsait gibi görünmesin.
+   * Geçmiş boş slot aç/kapat/rezervasyon gibi aksiyonlara uygun değilse butonlar disable edilsin.
+
+3. Backend tarafı:
+
+   * POST /api/appointments endpointinde de güvenlik kontrolü ekle.
+   * Müşteri geçmiş/başlamış slota randevu alamamalı.
+   * Kontrol date + startTime’a göre yapılmalı.
+   * Eğer slot date bugünden önceyse veya bugün ve startTime <= now ise 400 dön:
+     { "error": "Bu randevu saati artık alınamaz" }
+   * Bu kontrol frontend’e güvenmeden backend’de de olmalı.
+
+4. Timezone:
+
+   * Türkiye saatiyle çalışacak şekilde mevcut tarih/saat karşılaştırmasını güvenli yap.
+   * Slot date formatı YYYY-MM-DD, startTime HH:MM.
+   * Mevcut app Türkiye kullanımında olduğu için Europe/Istanbul/Türkiye saati baz alınmalı.
+
+5. UI metinleri:
+
+   * Müşteri tarafında geçmiş/başlamış slot: “Geçti”
+   * Berber tarafında boş geçmiş slot: “Geçti”
+   * Berber tarafında dolu ve başlamış slot: müşteri bilgisi gösterilmeye devam etsin, ama görsel olarak geçmiş/başlamış olduğu belli olsun.
+
+6. Typecheck temiz olmalı:
+   cd ~/workspace
+   pnpm run typecheck

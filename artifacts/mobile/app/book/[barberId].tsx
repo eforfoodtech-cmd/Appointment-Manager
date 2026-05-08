@@ -92,14 +92,24 @@ export default function BookingScreen() {
     },
   });
 
-  const todayStr = new Date().toISOString().split("T")[0]!;
-  const currentHour = new Date().getHours();
+  function getNowIstanbul() {
+    const str = new Date().toLocaleString("sv-SE", { timeZone: "Europe/Istanbul" });
+    const [datePart, timePart] = str.split(" ");
+    const [hStr, mStr] = (timePart ?? "00:00").split(":");
+    return {
+      date: datePart ?? "",
+      minutes: parseInt(hStr ?? "0", 10) * 60 + parseInt(mStr ?? "0", 10),
+    };
+  }
 
-  // A slot is "past" if it's today and its start hour has already passed
+  const { date: todayStr, minutes: nowMinutes } = getNowIstanbul();
+
+  // A slot is "past" if selectedDate < today OR it's today and startTime <= now (Istanbul)
   const isPastSlot = (startTime: string) => {
-    if (selectedDate !== todayStr) return false;
-    const slotHour = parseInt(startTime.split(":")[0]!, 10);
-    return slotHour < currentHour;
+    if (selectedDate > todayStr) return false;
+    if (selectedDate < todayStr) return true;
+    const [h, m] = startTime.split(":").map(Number);
+    return (h ?? 0) * 60 + (m ?? 0) <= nowMinutes;
   };
 
   // Show all barber-opened slots: available ones selectable, booked ones shown as "Dolu"
