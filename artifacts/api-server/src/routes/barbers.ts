@@ -414,17 +414,22 @@ function generateSlotPairs(
 }
 
 // ─── Authoritative slot sync for one day ─────────────────────────────────────
-// Algorithm:
-//  1. Collect all slot IDs for the day.
-//  2. Find slots that have an ACTIVE appointment (pending|confirmed) → protected.
-//  3. Delete every non-protected slot (unbooked, cancelled-only, no_show-only, etc.)
-//  4. If slotPairs is null → closed day, stop.
-//  5. Re-insert template slots, skipping startTimes that collide with protected slots.
+// Three-tier categorisation of existing slots:
+//
+//  ACTIVE    – slot has a pending|confirmed appointment   → never touch
+//  FK-LINKED – slot has only cancelled|completed|no_show  → cannot DELETE (FK
+//              RESTRICT); mark is_available=false instead, or restore if the
+//              startTime still belongs to the new template
+//  FREE      – slot has no appointments at all            → safe to DELETE
+//
+// After cleanup, insert template slots whose startTime is not already occupied
+// by an ACTIVE or FK-LINKED slot.
 async function syncDaySlots(
   barberId: number,
   date: string,
   slotPairs: Array<{ startTime: string; endTime: string }> | null,
-): Promise<{ inserted: number; deleted: number }> {
+): Promise<{ inserted: number; deleted: number; hidden: number }> {
+  // 1. Fetch all existing slots for this barber+date
   const allSlots = await db
     .select({
       id: appointmentSlotsTable.id,
@@ -438,52 +443,79 @@ async function syncDaySlots(
       ),
     );
 
-  // Find slots with active (pending|confirmed) appointments → must not delete
-  let protectedSlotIds = new Set<number>();
+  // 2. Categorise by appointments linked to each slot
+  const activeSlotIds = new Set<number>();   // pending | confirmed → fully protect
+  const fkLinkedSlotIds = new Set<number>(); // cancelled | completed | no_show → FK-blocked
+
   if (allSlots.length > 0) {
     const slotIds = allSlots.map((s) => s.id);
-    const activeAppts = await db
-      .select({ slotId: appointmentsTable.slotId })
+    const appts = await db
+      .select({ slotId: appointmentsTable.slotId, status: appointmentsTable.status })
       .from(appointmentsTable)
-      .where(
-        and(
-          inArray(appointmentsTable.slotId, slotIds),
-          inArray(
-            appointmentsTable.status,
-            ["pending", "confirmed"] as Array<
-              "pending" | "confirmed" | "cancelled" | "completed" | "no_show"
-            >,
-          ),
-        ),
-      );
-    protectedSlotIds = new Set(activeAppts.map((a) => a.slotId));
+      .where(inArray(appointmentsTable.slotId, slotIds));
+
+    for (const appt of appts) {
+      if (appt.status === "pending" || appt.status === "confirmed") {
+        activeSlotIds.add(appt.slotId);
+      } else if (!activeSlotIds.has(appt.slotId)) {
+        fkLinkedSlotIds.add(appt.slotId);
+      }
+    }
+    // If a slot has both active and non-active appts, active wins
+    for (const id of activeSlotIds) fkLinkedSlotIds.delete(id);
   }
 
-  // Delete every non-protected slot
-  const toDeleteIds = allSlots
-    .filter((s) => !protectedSlotIds.has(s.id))
+  // 3. Delete FREE slots (no appointments at all)
+  const freeSlotIds = allSlots
+    .filter((s) => !activeSlotIds.has(s.id) && !fkLinkedSlotIds.has(s.id))
     .map((s) => s.id);
 
-  if (toDeleteIds.length > 0) {
+  if (freeSlotIds.length > 0) {
     await db
       .delete(appointmentSlotsTable)
-      .where(inArray(appointmentSlotsTable.id, toDeleteIds));
+      .where(inArray(appointmentSlotsTable.id, freeSlotIds));
   }
 
-  // Closed day or no pairs → done
+  // 4. Build template lookup (null = closed day)
+  const templateByStart = new Map(
+    (slotPairs ?? []).map((p) => [p.startTime, p]),
+  );
+
+  // 5. Handle FK-LINKED slots: restore if template has same startTime, else hide
+  const fkLinkedSlots = allSlots.filter((s) => fkLinkedSlotIds.has(s.id));
+  let hidden = 0;
+  for (const slot of fkLinkedSlots) {
+    const pair = templateByStart.get(slot.startTime);
+    if (pair && slotPairs) {
+      // Slot startTime is in the new template → update endTime and restore
+      await db
+        .update(appointmentSlotsTable)
+        .set({ endTime: pair.endTime, isAvailable: true, isBooked: false })
+        .where(eq(appointmentSlotsTable.id, slot.id));
+    } else {
+      // Slot startTime not in template (or day closed) → hide from customers
+      await db
+        .update(appointmentSlotsTable)
+        .set({ isAvailable: false, isBooked: false })
+        .where(eq(appointmentSlotsTable.id, slot.id));
+      hidden++;
+    }
+  }
+
+  // 6. If closed day, stop here
   if (!slotPairs || slotPairs.length === 0) {
-    return { inserted: 0, deleted: toDeleteIds.length };
+    return { inserted: 0, deleted: freeSlotIds.length, hidden };
   }
 
-  // Protected slots' startTimes must not be duplicated
-  const protectedStartTimes = new Set(
+  // 7. Insert new slots for template pairs not occupied by ACTIVE or FK-LINKED slots
+  const occupiedStartTimes = new Set<string>(
     allSlots
-      .filter((s) => protectedSlotIds.has(s.id))
+      .filter((s) => activeSlotIds.has(s.id) || fkLinkedSlotIds.has(s.id))
       .map((s) => s.startTime),
   );
 
   const toInsert = slotPairs
-    .filter((p) => !protectedStartTimes.has(p.startTime))
+    .filter((p) => !occupiedStartTimes.has(p.startTime))
     .map((p) => ({
       barberId,
       date,
@@ -497,7 +529,7 @@ async function syncDaySlots(
     await db.insert(appointmentSlotsTable).values(toInsert);
   }
 
-  return { inserted: toInsert.length, deleted: toDeleteIds.length };
+  return { inserted: toInsert.length, deleted: freeSlotIds.length, hidden };
 }
 
 // ─── POST /api/barbers/me/slots/seed-week ─────────────────────────────────────
