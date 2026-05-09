@@ -261,6 +261,43 @@ router.put(
         .returning();
     });
 
+    const templateMap = new Map(
+      inserted.map((row) => [
+        row.dayOfWeek,
+        row.isOpen
+          ? {
+              startTime: row.startTime,
+              endTime: row.endTime,
+              slotDuration: row.slotDuration,
+            }
+          : null,
+      ]),
+    );
+
+    for (const item of items) {
+      const today = new Date();
+      const dates: string[] = [];
+      for (let i = 0; i < 7; i++) {
+        const d = new Date(today);
+        d.setDate(today.getDate() + i);
+        dates.push(d.toISOString().split("T")[0]!);
+      }
+
+      for (const date of dates) {
+        const dayOfWeek = new Date(date + "T12:00:00").getDay();
+        if (dayOfWeek !== item.dayOfWeek) continue;
+
+        const tmpl = templateMap.get(dayOfWeek);
+        if (!tmpl) {
+          await syncDaySlots(barber.id, date, null);
+          continue;
+        }
+
+        const slotPairs = generateSlotPairs(tmpl.startTime, tmpl.endTime, tmpl.slotDuration);
+        await syncDaySlots(barber.id, date, slotPairs);
+      }
+    }
+
     res.json(inserted);
   },
 );
