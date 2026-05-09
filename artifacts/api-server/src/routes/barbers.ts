@@ -463,6 +463,7 @@ router.post(
           .select({
             id: appointmentSlotsTable.id,
             startTime: appointmentSlotsTable.startTime,
+            endTime: appointmentSlotsTable.endTime,
             isBooked: appointmentSlotsTable.isBooked,
           })
           .from(appointmentSlotsTable)
@@ -472,6 +473,9 @@ router.post(
               eq(appointmentSlotsTable.date, date),
             ),
           );
+
+        // Map startTime → expected endTime from template
+        const slotPairMap = new Map(slotPairs.map((p) => [p.startTime, p.endTime]));
 
         // Delete unbooked slots that are outside the new template
         // Also guard against FK violations: exclude slots that have any appointment row
@@ -493,6 +497,20 @@ router.post(
           await db
             .delete(appointmentSlotsTable)
             .where(inArray(appointmentSlotsTable.id, toDelete));
+        }
+
+        // Fix endTime on existing unbooked slots whose endTime no longer matches the template
+        const slotsToFix = existingSlots.filter((s) => {
+          if (s.isBooked) return false;
+          const expectedEnd = slotPairMap.get(s.startTime);
+          return expectedEnd !== undefined && s.endTime !== expectedEnd;
+        });
+
+        for (const slot of slotsToFix) {
+          await db
+            .update(appointmentSlotsTable)
+            .set({ endTime: slotPairMap.get(slot.startTime)! })
+            .where(eq(appointmentSlotsTable.id, slot.id));
         }
 
         // Insert template slots that don't exist yet
