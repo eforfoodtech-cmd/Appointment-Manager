@@ -1,0 +1,97 @@
+Haftalık program slot sync bug’ını daha sert ve güvenli şekilde düzelt.
+
+Önceki fix yeterli olmadı. DB’de aynı gün için eski slotlar ve yeni slotlar üst üste bindi.
+
+Gerçek DB örneği:
+2026-05-11 için 30 dk programa geçilmesine rağmen şu karışık kayıtlar oluştu:
+
+* 10:00–11:00 eski 60 dk slot kaldı ❌
+* 10:30–11:00 yeni 30 dk slot eklendi ✅
+* 11:00–12:00 eski 60 dk slot kaldı ❌
+* 11:30–12:00 yeni 30 dk slot eklendi ✅
+
+2026-05-12 için de 45/90 dk karışımı gibi üst üste binmiş slotlar var:
+
+* 10:00–11:00 eski slot kaldı ❌
+* 10:45–11:30 yeni slot eklendi ✅
+* 11:30–13:00 eski/90 dk slot kaldı ❌
+* 12:15–13:00 yeni 45 dk slot eklendi ✅
+
+Sorun:
+Aynı startTime varsa endTime update etmeye çalışma çözümü yetmedi. Çünkü farklı startTime’lı eski slotlar program dışı veya yeni düzene aykırı şekilde DB’de kalıyor.
+
+İstenen doğru algoritma:
+Bir günün availability/programı kaydedildiğinde veya seed-week çalıştığında:
+
+1. O gün için mevcut booked/randevulu slotları koru.
+
+   * isBooked=true olan veya appointments tablosunda aktif appointment bağlı olan slotlara dokunma.
+   * Aktif appointment: status NOT IN ('cancelled','no_show')
+   * Booked slot program dışına düşse bile korunmalı.
+
+2. O gün için booked olmayan tüm slotları sil.
+
+   * appointment_slots içinde aynı barberId + date için isBooked=false olan slotlar silinsin.
+   * Ayrıca cancelled/no_show appointment bağlı slot varsa, aktif appointment olmadığı için boş sayılabilir; ama FK varsa önce o appointment ilişkisini dikkate al. En güvenlisi: appointment bağlı olmayan unbooked slotları sil. Cancelled appointment bağlı slotlar için mevcut sistem nasıl davranıyorsa ona göre güvenli ilerle.
+
+3. Availability’ye göre doğru slotları baştan üret.
+
+   * start = availability.startTime
+   * end = start + slotDuration
+   * sadece end <= availability.endTime ise slot oluştur
+   * slotDuration destekleri: 30, 45, 60, 90
+
+4. Yeni slot üretirken:
+
+   * Eğer aynı startTime’da booked/aktif appointment olan slot varsa duplicate oluşturma.
+   * Eğer unique constraint’e takılacak bir slot varsa atla.
+   * Booked slotların startTime’ları korunmalı.
+
+5. Kapalı gün için:
+
+   * O günün booked/aktif appointment olmayan slotları silinsin.
+   * Booked/aktif appointment olanlar korunmalı.
+
+6. Bu logic hem:
+
+   * PUT /barbers/me/availability sonrası
+   * POST /barbers/me/slots/seed-week
+     içinde aynı helper/fonksiyonla çalışsın. İki ayrı farklı sync mantığı kalmasın.
+
+7. DB’de şu an oluşmuş karışık boş slotları da temizle:
+
+   * barberId=2
+   * 2026-05-11, 2026-05-12 gibi test günlerindeki booked olmayan karışık slotlar, yeni availability’ye göre tekrar oluşturulsun.
+   * Booked olan slotlar korunmalı.
+
+8. Typecheck temiz olmalı:
+   cd ~/workspace
+   pnpm run typecheck
+
+9. Kontrol senaryoları:
+
+   * 2026-05-11 / Pazartesi / 30 dk:
+     10:00–10:30
+     10:30–11:00
+     11:00–11:30
+     11:30–12:00
+     şeklinde olmalı. 10:00–11:00 gibi eski 60 dk slot kalmamalı.
+
+   * 2026-05-12 / Salı / 45 dk:
+     10:00–10:45
+     10:45–11:30
+     11:30–12:15
+     12:15–13:00
+     şeklinde olmalı. 10:00–11:00 veya 11:30–13:00 gibi eski slot kalmamalı.
+
+   * 90 dk:
+     10:00–11:30
+     11:30–13:00
+     13:00–14:30
+     şeklinde olmalı.
+
+   * 60 dk:
+     10:00–11:00
+     11:00–12:00
+     12:00–13:00
+     şeklinde olmalı.

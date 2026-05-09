@@ -379,15 +379,98 @@ function generateSlotPairs(
   return pairs;
 }
 
+// ─── Authoritative slot sync for one day ─────────────────────────────────────
+// Algorithm:
+//  1. Collect all slot IDs for the day.
+//  2. Find slots that have an ACTIVE appointment (pending|confirmed) → protected.
+//  3. Delete every non-protected slot (unbooked, cancelled-only, no_show-only, etc.)
+//  4. If slotPairs is null → closed day, stop.
+//  5. Re-insert template slots, skipping startTimes that collide with protected slots.
+async function syncDaySlots(
+  barberId: number,
+  date: string,
+  slotPairs: Array<{ startTime: string; endTime: string }> | null,
+): Promise<{ inserted: number; deleted: number }> {
+  const allSlots = await db
+    .select({
+      id: appointmentSlotsTable.id,
+      startTime: appointmentSlotsTable.startTime,
+    })
+    .from(appointmentSlotsTable)
+    .where(
+      and(
+        eq(appointmentSlotsTable.barberId, barberId),
+        eq(appointmentSlotsTable.date, date),
+      ),
+    );
+
+  // Find slots with active (pending|confirmed) appointments → must not delete
+  let protectedSlotIds = new Set<number>();
+  if (allSlots.length > 0) {
+    const slotIds = allSlots.map((s) => s.id);
+    const activeAppts = await db
+      .select({ slotId: appointmentsTable.slotId })
+      .from(appointmentsTable)
+      .where(
+        and(
+          inArray(appointmentsTable.slotId, slotIds),
+          inArray(
+            appointmentsTable.status,
+            ["pending", "confirmed"] as Array<
+              "pending" | "confirmed" | "cancelled" | "completed" | "no_show"
+            >,
+          ),
+        ),
+      );
+    protectedSlotIds = new Set(activeAppts.map((a) => a.slotId));
+  }
+
+  // Delete every non-protected slot
+  const toDeleteIds = allSlots
+    .filter((s) => !protectedSlotIds.has(s.id))
+    .map((s) => s.id);
+
+  if (toDeleteIds.length > 0) {
+    await db
+      .delete(appointmentSlotsTable)
+      .where(inArray(appointmentSlotsTable.id, toDeleteIds));
+  }
+
+  // Closed day or no pairs → done
+  if (!slotPairs || slotPairs.length === 0) {
+    return { inserted: 0, deleted: toDeleteIds.length };
+  }
+
+  // Protected slots' startTimes must not be duplicated
+  const protectedStartTimes = new Set(
+    allSlots
+      .filter((s) => protectedSlotIds.has(s.id))
+      .map((s) => s.startTime),
+  );
+
+  const toInsert = slotPairs
+    .filter((p) => !protectedStartTimes.has(p.startTime))
+    .map((p) => ({
+      barberId,
+      date,
+      startTime: p.startTime,
+      endTime: p.endTime,
+      isAvailable: true,
+      isBooked: false,
+    }));
+
+  if (toInsert.length > 0) {
+    await db.insert(appointmentSlotsTable).values(toInsert);
+  }
+
+  return { inserted: toInsert.length, deleted: toDeleteIds.length };
+}
+
 // ─── POST /api/barbers/me/slots/seed-week ─────────────────────────────────────
-// Fills empty days in the next 7 days using the barber's weekly availability template.
-//
-// Rules:
-//  1. If a day already has ANY slots → skip (never overwrite manual edits).
-//  2. If barber has NO availability template at all → use default 13-slot schedule.
-//  3. If template exists for that day_of_week and is_open=true → generate slots from template.
-//  4. If template exists for that day_of_week and is_open=false → no slots (closed day).
-//  5. If template exists but has no entry for that day_of_week → no slots.
+// Syncs the next 7 days of slots to the barber's weekly availability template.
+// Uses syncDaySlots: nukes all non-protected slots, re-inserts from template.
+// Protected = slots with pending|confirmed appointments (never touched).
+// No template → default 10:00–23:00 60-min slots (only if day has NO slots yet).
 router.post(
   "/me/slots/seed-week",
   authenticate,
@@ -404,14 +487,12 @@ router.post(
       return;
     }
 
-    // Load the barber's weekly availability template
     const availRows = await db
       .select()
       .from(availabilityTable)
       .where(eq(availabilityTable.barberId, barber.id));
 
     const hasTemplate = availRows.length > 0;
-    // Map dayOfWeek → template row
     const templateMap = new Map(availRows.map((r) => [r.dayOfWeek, r]));
 
     const today = new Date();
@@ -422,123 +503,33 @@ router.post(
       dates.push(d.toISOString().split("T")[0]!);
     }
 
-    // Standard fallback schedule: 10:00–23:00 in 1-hour slots (13 slots)
-    const DEFAULT_HOURS = Array.from({ length: 13 }, (_, i) => i + 10);
-
     let totalInserted = 0;
-    const summary: Record<string, { inserted: number; skipped: boolean; closed?: boolean }> = {};
+    const summary: Record<string, { inserted: number; deleted: number; closed?: boolean }> = {};
 
     for (const date of dates) {
-      const dayOfWeek = new Date(date + "T12:00:00").getDay(); // 0=Sun…6=Sat
+      const dayOfWeek = new Date(date + "T12:00:00").getDay();
 
-      // If template marks this day as closed → delete unbooked slots, skip insert
       if (hasTemplate) {
         const tmpl = templateMap.get(dayOfWeek);
+
+        // Closed day or no template entry → wipe unprotected slots, insert nothing
         if (!tmpl || !tmpl.isOpen) {
-          await db
-            .delete(appointmentSlotsTable)
-            .where(
-              and(
-                eq(appointmentSlotsTable.barberId, barber.id),
-                eq(appointmentSlotsTable.date, date),
-                eq(appointmentSlotsTable.isBooked, false),
-              ),
-            );
-          summary[date] = { inserted: 0, skipped: false, closed: true };
-          req.log.info({ barberId: barber.id, date, dayOfWeek }, "seed-week: day closed, cleared unbooked slots");
+          const result = await syncDaySlots(barber.id, date, null);
+          summary[date] = { ...result, closed: true };
+          req.log.info({ barberId: barber.id, date, dayOfWeek, ...result }, "seed-week: day closed");
           continue;
         }
-      }
 
-      if (hasTemplate) {
-        // ── Template sync for open day ─────────────────────────────────────
-        // 1. Delete unbooked slots whose startTime is NOT in the template
-        // 2. Insert template slots that are missing
-        // 3. Never touch booked slots
-        const tmpl = templateMap.get(dayOfWeek)!; // already confirmed isOpen above
+        // Open day → full sync against template
         const slotPairs = generateSlotPairs(tmpl.startTime, tmpl.endTime, tmpl.slotDuration);
-        const templateStartTimes = slotPairs.map((p) => p.startTime);
-
-        const existingSlots = await db
-          .select({
-            id: appointmentSlotsTable.id,
-            startTime: appointmentSlotsTable.startTime,
-            endTime: appointmentSlotsTable.endTime,
-            isBooked: appointmentSlotsTable.isBooked,
-          })
-          .from(appointmentSlotsTable)
-          .where(
-            and(
-              eq(appointmentSlotsTable.barberId, barber.id),
-              eq(appointmentSlotsTable.date, date),
-            ),
-          );
-
-        // Map startTime → expected endTime from template
-        const slotPairMap = new Map(slotPairs.map((p) => [p.startTime, p.endTime]));
-
-        // Delete unbooked slots that are outside the new template
-        // Also guard against FK violations: exclude slots that have any appointment row
-        const candidateIds = existingSlots
-          .filter((s) => !s.isBooked && !templateStartTimes.includes(s.startTime))
-          .map((s) => s.id);
-
-        let toDelete: number[] = [];
-        if (candidateIds.length > 0) {
-          const referenced = await db
-            .select({ slotId: appointmentsTable.slotId })
-            .from(appointmentsTable)
-            .where(inArray(appointmentsTable.slotId, candidateIds));
-          const referencedIds = new Set(referenced.map((r) => r.slotId));
-          toDelete = candidateIds.filter((id) => !referencedIds.has(id));
-        }
-
-        if (toDelete.length > 0) {
-          await db
-            .delete(appointmentSlotsTable)
-            .where(inArray(appointmentSlotsTable.id, toDelete));
-        }
-
-        // Fix endTime on existing unbooked slots whose endTime no longer matches the template
-        const slotsToFix = existingSlots.filter((s) => {
-          if (s.isBooked) return false;
-          const expectedEnd = slotPairMap.get(s.startTime);
-          return expectedEnd !== undefined && s.endTime !== expectedEnd;
-        });
-
-        for (const slot of slotsToFix) {
-          await db
-            .update(appointmentSlotsTable)
-            .set({ endTime: slotPairMap.get(slot.startTime)! })
-            .where(eq(appointmentSlotsTable.id, slot.id));
-        }
-
-        // Insert template slots that don't exist yet
-        const existingStartTimes = new Set(existingSlots.map((s) => s.startTime));
-        const toInsert = slotPairs
-          .filter((p) => !existingStartTimes.has(p.startTime))
-          .map((p) => ({
-            barberId: barber.id,
-            date,
-            startTime: p.startTime,
-            endTime: p.endTime,
-            isAvailable: true,
-            isBooked: false,
-          }));
-        if (toInsert.length > 0) {
-          await db.insert(appointmentSlotsTable).values(toInsert);
-        }
-
-        totalInserted += toInsert.length;
-        summary[date] = { inserted: toInsert.length, skipped: false };
-        req.log.info(
-          { barberId: barber.id, date, inserted: toInsert.length, deleted: toDelete.length },
-          "seed-week: synced open day",
-        );
+        const result = await syncDaySlots(barber.id, date, slotPairs);
+        totalInserted += result.inserted;
+        summary[date] = result;
+        req.log.info({ barberId: barber.id, date, ...result }, "seed-week: synced open day");
         continue;
       }
 
-      // ── No-template fallback: skip if any slots exist, else insert defaults ──
+      // No template → only seed if day currently has NO slots at all
       const existing = await db
         .select({ id: appointmentSlotsTable.id })
         .from(appointmentSlotsTable)
@@ -551,35 +542,17 @@ router.post(
         .limit(1);
 
       if (existing.length > 0) {
-        summary[date] = { inserted: 0, skipped: true };
+        summary[date] = { inserted: 0, deleted: 0 };
         req.log.info({ barberId: barber.id, date }, "seed-week: no template, day has slots, skipped");
         continue;
       }
 
-      const slotPairs = DEFAULT_HOURS.map((hour) => ({
-        startTime: `${String(hour).padStart(2, "0")}:00`,
-        endTime:   `${String(hour + 1).padStart(2, "0")}:00`,
-      }));
-      req.log.info({ barberId: barber.id, date, count: slotPairs.length }, "seed-week: no template, using default");
-
-      if (slotPairs.length === 0) {
-        summary[date] = { inserted: 0, skipped: false };
-        continue;
-      }
-
-      const toInsert = slotPairs.map((p) => ({
-        barberId: barber.id,
-        date,
-        startTime: p.startTime,
-        endTime: p.endTime,
-        isAvailable: true,
-        isBooked: false,
-      }));
-
-      await db.insert(appointmentSlotsTable).values(toInsert);
-      totalInserted += toInsert.length;
-      summary[date] = { inserted: toInsert.length, skipped: false };
-      req.log.info({ barberId: barber.id, date, inserted: toInsert.length }, "seed-week: day seeded");
+      // Default: 10:00–23:00 in 60-min slots
+      const defaultPairs = generateSlotPairs("10:00", "23:00", 60);
+      const result = await syncDaySlots(barber.id, date, defaultPairs);
+      totalInserted += result.inserted;
+      summary[date] = result;
+      req.log.info({ barberId: barber.id, date, ...result }, "seed-week: seeded with defaults");
     }
 
     req.log.info({ barberId: barber.id, totalInserted }, "seed-week: completed");
