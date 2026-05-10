@@ -48,6 +48,24 @@ function normalizeDate(date: string): string | null {
   return date;
 }
 
+function getNowIstanbul(): { date: string; minutesOfDay: number } {
+  const str = new Date().toLocaleString("sv-SE", { timeZone: "Europe/Istanbul" });
+  const [datePart, timePart] = str.split(" ");
+  const [hStr, mStr] = (timePart ?? "00:00").split(":");
+  return {
+    date: datePart ?? "",
+    minutesOfDay: parseInt(hStr ?? "0", 10) * 60 + parseInt(mStr ?? "0", 10),
+  };
+}
+
+function isSlotPast(slotDate: string, slotStartTime: string): boolean {
+  const { date: nowDate, minutesOfDay: nowMin } = getNowIstanbul();
+  return (
+    slotDate < nowDate ||
+    (slotDate === nowDate && timeToMinutes(slotStartTime) <= nowMin)
+  );
+}
+
 function isValidAvailabilityRow(item: {
   dayOfWeek: number;
   startTime: string;
@@ -724,21 +742,42 @@ router.patch(
       return;
     }
 
-    const [updated] = await db
-      .update(appointmentSlotsTable)
-      .set({ isAvailable })
+    const [slot] = await db
+      .select({
+        id: appointmentSlotsTable.id,
+        date: appointmentSlotsTable.date,
+        startTime: appointmentSlotsTable.startTime,
+        isBooked: appointmentSlotsTable.isBooked,
+      })
+      .from(appointmentSlotsTable)
       .where(
         and(
           eq(appointmentSlotsTable.id, slotId),
           eq(appointmentSlotsTable.barberId, barber.id),
         ),
       )
-      .returning();
+      .limit(1);
 
-    if (!updated) {
+    if (!slot) {
       res.status(404).json({ error: "Slot bulunamadı" });
       return;
     }
+
+    if (isSlotPast(slot.date, slot.startTime)) {
+      res.status(409).json({ error: "Geçmiş slot değiştirilemez" });
+      return;
+    }
+
+    if (slot.isBooked) {
+      res.status(409).json({ error: "Randevulu slot değiştirilemez" });
+      return;
+    }
+
+    const [updated] = await db
+      .update(appointmentSlotsTable)
+      .set({ isAvailable })
+      .where(eq(appointmentSlotsTable.id, slotId))
+      .returning();
 
     res.json(updated);
   },
@@ -767,30 +806,42 @@ router.delete(
       return;
     }
 
-    const result = await db.transaction(async (tx) => {
-      const [slot] = await tx
-        .select({ id: appointmentSlotsTable.id })
-        .from(appointmentSlotsTable)
-        .where(
-          and(
-            eq(appointmentSlotsTable.id, slotId),
-            eq(appointmentSlotsTable.barberId, barber.id),
-            eq(appointmentSlotsTable.isBooked, false),
-          ),
-        )
-        .limit(1);
+    const [slot] = await db
+      .select({
+        id: appointmentSlotsTable.id,
+        date: appointmentSlotsTable.date,
+        startTime: appointmentSlotsTable.startTime,
+        isBooked: appointmentSlotsTable.isBooked,
+      })
+      .from(appointmentSlotsTable)
+      .where(
+        and(
+          eq(appointmentSlotsTable.id, slotId),
+          eq(appointmentSlotsTable.barberId, barber.id),
+        ),
+      )
+      .limit(1);
 
-      if (!slot) return null;
-
-      await tx.delete(appointmentsTable).where(eq(appointmentsTable.slotId, slotId));
-      await tx.delete(appointmentSlotsTable).where(eq(appointmentSlotsTable.id, slotId));
-      return slot;
-    });
-
-    if (!result) {
-      res.status(404).json({ error: "Slot bulunamadı veya dolu slot silinemez" });
+    if (!slot) {
+      res.status(404).json({ error: "Slot bulunamadı" });
       return;
     }
+
+    if (isSlotPast(slot.date, slot.startTime)) {
+      res.status(409).json({ error: "Geçmiş slot silinemez" });
+      return;
+    }
+
+    if (slot.isBooked) {
+      res.status(409).json({ error: "Randevulu slot silinemez" });
+      return;
+    }
+
+    // isBooked=false garantili — bağlı cancelled/no_show appointment'ları da temizle (FK safety)
+    await db.transaction(async (tx) => {
+      await tx.delete(appointmentsTable).where(eq(appointmentsTable.slotId, slotId));
+      await tx.delete(appointmentSlotsTable).where(eq(appointmentSlotsTable.id, slotId));
+    });
 
     res.status(204).send();
   },
