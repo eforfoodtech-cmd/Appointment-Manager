@@ -452,6 +452,7 @@ async function syncDaySlots(
     .select({
       id: appointmentSlotsTable.id,
       startTime: appointmentSlotsTable.startTime,
+      endTime: appointmentSlotsTable.endTime,
     })
     .from(appointmentSlotsTable)
     .where(
@@ -525,15 +526,31 @@ async function syncDaySlots(
     return { inserted: 0, deleted: freeSlotIds.length, hidden };
   }
 
-  // 7. Insert new slots for template pairs not occupied by ACTIVE or FK-LINKED slots
+  // 7. Insert new slots for template pairs not occupied by ACTIVE/FK-LINKED slots
+  // and which do not OVERLAP an ACTIVE (booked) slot's time interval. This
+  // prevents creating a free slot like 11:30–12:00 alongside a booked 11:00–12:00
+  // when the day's slot duration shrinks.
   const occupiedStartTimes = new Set<string>(
     allSlots
       .filter((s) => activeSlotIds.has(s.id) || fkLinkedSlotIds.has(s.id))
       .map((s) => s.startTime),
   );
 
+  const activeRanges = allSlots
+    .filter((s) => activeSlotIds.has(s.id))
+    .map((s) => ({
+      start: timeToMinutes(s.startTime),
+      end: timeToMinutes(s.endTime),
+    }));
+
+  const overlapsActive = (startTime: string, endTime: string): boolean => {
+    const ns = timeToMinutes(startTime);
+    const ne = timeToMinutes(endTime);
+    return activeRanges.some((r) => ns < r.end && ne > r.start);
+  };
+
   const toInsert = slotPairs
-    .filter((p) => !occupiedStartTimes.has(p.startTime))
+    .filter((p) => !occupiedStartTimes.has(p.startTime) && !overlapsActive(p.startTime, p.endTime))
     .map((p) => ({
       barberId,
       date,
