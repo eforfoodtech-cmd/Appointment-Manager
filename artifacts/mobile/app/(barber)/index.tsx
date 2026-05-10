@@ -51,7 +51,7 @@ export default function BarberDashboard() {
 
   const handleStatusChange = (
     id: number,
-    status: "completed" | "cancelled" | "no_show",
+    status: "cancelled" | "no_show",
   ) => {
     updateAppt.mutate({ appointmentId: id, data: { status } });
   };
@@ -114,7 +114,6 @@ export default function BarberDashboard() {
                 appointment={appt as any}
                 role="barber"
                 onPress={() => router.push(`/appointment/${appt.id}`)}
-                onComplete={() => handleStatusChange(appt.id, "completed")}
                 onNoShow={() => handleStatusChange(appt.id, "no_show")}
                 onCancel={() => handleStatusChange(appt.id, "cancelled")}
               />

@@ -18,7 +18,6 @@ import { Feather } from "@expo/vector-icons";
 import {
   useGetAppointment,
   useUpdateAppointment,
-  useCreateBlock,
   getGetAppointmentQueryKey,
   getListAppointmentsQueryKey,
   getGetBarberDashboardQueryKey,
@@ -77,85 +76,33 @@ export default function AppointmentDetail() {
     },
   });
 
-  const createBlock = useCreateBlock({
-    mutation: {
-      onSuccess: () => {
-        queryClient.invalidateQueries({
-          predicate: (q) =>
-            typeof q.queryKey[0] === "string" &&
-            (q.queryKey[0] as string).includes("/api/barbers/me/blocks"),
-        });
-        // After blocking, also go back so the screen doesn't freeze
-        goBack();
-      },
-      onError: (err: any) => Alert.alert("Hata", err?.data?.error || "Engellenemedi"),
-    },
-  });
+  const isMutating = update.isPending;
 
-  const isMutating = update.isPending || createBlock.isPending;
-
-  const handleStatusChange = (status: "cancelled" | "no_show" | "completed") => {
+  const handleStatusChange = (status: "cancelled" | "no_show") => {
     const labels: Record<string, { title: string; msg: string; btn: string }> = {
       cancelled: {
         title: "Randevuyu İptal Et",
-        msg: "Bu randevuyu iptal etmek istiyor musunuz?",
+        msg: "Bu randevuyu iptal etmek istediğine emin misin?",
         btn: "İptal Et",
       },
       no_show: {
         title: "Gelmedi İşareti",
-        msg: "Müşteri gelmedi olarak işaretlensin mi?",
+        msg: "Müşteri gelmedi olarak işaretlensin mi? (1 ay süreli engel oluşur)",
         btn: "İşaretle",
-      },
-      completed: {
-        title: "Tamamlandı",
-        msg: "Randevuyu tamamlandı olarak işaretleyelim mi?",
-        btn: "Tamamlandı",
       },
     };
 
-    const { title, msg, btn } = labels[status];
+    const { title, msg, btn } = labels[status]!;
 
     Alert.alert(title, msg, [
-      { text: "Geri", style: "cancel" },
+      { text: "Vazgeç", style: "cancel" },
       {
         text: btn,
-        style: status === "completed" ? "default" : "destructive",
+        style: "destructive",
         onPress: () =>
           update.mutate({ appointmentId: apptId, data: { status } }),
       },
     ]);
-  };
-
-  const handleBlock = () => {
-    Alert.alert(
-      "Müşteriyi Engelle",
-      "Bu müşteri artık randevu alamayacak. Süreyi seçin:",
-      [
-        { text: "İptal", style: "cancel" },
-        {
-          text: "1 Ay",
-          onPress: () => {
-            const exp = new Date();
-            exp.setMonth(exp.getMonth() + 1);
-            createBlock.mutate({
-              data: {
-                customerId: appt!.customerId,
-                reason: "No-show",
-                expiresAt: exp.toISOString(),
-              },
-            });
-          },
-        },
-        {
-          text: "Kalıcı",
-          style: "destructive",
-          onPress: () =>
-            createBlock.mutate({
-              data: { customerId: appt!.customerId, reason: "No-show kalıcı engel" },
-            }),
-        },
-      ],
-    );
   };
 
   if (isLoading) {
@@ -177,6 +124,10 @@ export default function AppointmentDetail() {
   const statusInfo = STATUS_LABELS[appt.status] || { label: appt.status, color: c.mutedForeground };
   const isBarber = user?.role === "barber";
   const isActive = appt.status === "confirmed" || appt.status === "pending";
+  const slotStartMs = new Date(`${appt.date}T${appt.startTime}:00+03:00`).getTime();
+  const minutesToStart = (slotStartMs - Date.now()) / 60000;
+  const slotStarted = minutesToStart <= 0;
+  const customerCanCancel = minutesToStart > 5 * 60;
 
   return (
     <ScrollView
@@ -236,18 +187,14 @@ export default function AppointmentDetail() {
         <View style={styles.actions}>
           {isBarber ? (
             <>
-              <ActionBtn
-                icon="check-circle"
-                label="Tamamlandı"
-                color={c.success}
-                onPress={() => handleStatusChange("completed")}
-              />
-              <ActionBtn
-                icon="user-x"
-                label="Gelmedi"
-                color={c.warning}
-                onPress={() => handleStatusChange("no_show")}
-              />
+              {slotStarted && (
+                <ActionBtn
+                  icon="user-x"
+                  label="Gelmedi"
+                  color={c.warning}
+                  onPress={() => handleStatusChange("no_show")}
+                />
+              )}
               <ActionBtn
                 icon="x-circle"
                 label="İptal Et"
@@ -255,23 +202,19 @@ export default function AppointmentDetail() {
                 onPress={() => handleStatusChange("cancelled")}
               />
             </>
-          ) : (
+          ) : customerCanCancel ? (
             <ActionBtn
               icon="x-circle"
               label="İptal Et"
               color={c.destructive}
               onPress={() => handleStatusChange("cancelled")}
             />
+          ) : (
+            <Text style={styles.cancelHint}>
+              Randevuya 5 saatten az kaldığı için iptal edilemez.
+            </Text>
           )}
         </View>
-      )}
-
-      {/* Barber: block option after no-show */}
-      {isBarber && appt.status === "no_show" && !isMutating && (
-        <TouchableOpacity style={styles.blockBtn} onPress={handleBlock} activeOpacity={0.8}>
-          <Feather name="shield" size={18} color={c.destructive} />
-          <Text style={styles.blockText}>Müşteriyi Engelle</Text>
-        </TouchableOpacity>
       )}
     </ScrollView>
   );
@@ -399,18 +342,12 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   actionLabel: { fontSize: 12, fontFamily: "Inter_600SemiBold" },
-  blockBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    marginHorizontal: 16,
-    marginTop: 12,
-    paddingVertical: 14,
-    borderRadius: colors.radius,
-    backgroundColor: "#FEF2F2",
-    borderWidth: 1,
-    borderColor: "#FECACA",
+  cancelHint: {
+    flex: 1,
+    fontSize: 13,
+    fontFamily: "Inter_400Regular",
+    color: c.mutedForeground,
+    textAlign: "center",
+    paddingVertical: 12,
   },
-  blockText: { fontSize: 15, fontFamily: "Inter_600SemiBold", color: c.destructive },
 });

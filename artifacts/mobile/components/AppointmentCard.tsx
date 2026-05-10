@@ -47,22 +47,33 @@ interface Props {
   appointment: Appointment;
   role: "barber" | "customer";
   onPress?: () => void;
-  onComplete?: () => void;
   onNoShow?: () => void;
   onCancel?: () => void;
+}
+
+// Slot start has passed (Istanbul UTC+3, no DST)
+function isSlotStarted(date: string, startTime: string): boolean {
+  return Date.now() >= new Date(`${date}T${startTime}:00+03:00`).getTime();
+}
+
+// Customer can cancel only if more than 5 hours remain to slot start
+function canCustomerCancel(date: string, startTime: string): boolean {
+  const slotMs = new Date(`${date}T${startTime}:00+03:00`).getTime();
+  return (slotMs - Date.now()) / 60000 > 5 * 60;
 }
 
 export function AppointmentCard({
   appointment: appt,
   role,
   onPress,
-  onComplete,
   onNoShow,
   onCancel,
 }: Props) {
   const statusColor = STATUS_COLORS[appt.status] || c.mutedForeground;
   const statusLabel = STATUS_LABELS[appt.status] || appt.status;
   const isActive = appt.status === "confirmed" || appt.status === "pending";
+  const slotStarted = isSlotStarted(appt.date, appt.startTime);
+  const canCancelCust = canCustomerCancel(appt.date, appt.startTime);
 
   return (
     <TouchableOpacity
@@ -105,20 +116,30 @@ export function AppointmentCard({
         {/* Quick actions for barber */}
         {role === "barber" && isActive && (
           <View style={styles.actions}>
-            {onComplete && (
-              <QuickBtn icon="check" color={c.success} onPress={onComplete} />
-            )}
-            {onNoShow && (
+            {onNoShow && slotStarted && (
               <QuickBtn icon="user-x" color={c.warning} onPress={onNoShow} />
             )}
             {onCancel && (
-              <QuickBtn icon="x" color={c.destructive} onPress={onCancel} />
+              <QuickBtn
+                icon="x"
+                color={c.destructive}
+                onPress={() =>
+                  Alert.alert(
+                    "Randevuyu İptal Et",
+                    "Bu randevuyu iptal etmek istediğine emin misin?",
+                    [
+                      { text: "Vazgeç", style: "cancel" },
+                      { text: "İptal Et", style: "destructive", onPress: onCancel },
+                    ],
+                  )
+                }
+              />
             )}
           </View>
         )}
 
-        {/* Cancel for customer */}
-        {role === "customer" && isActive && onCancel && (
+        {/* Cancel for customer — only when >5h remain */}
+        {role === "customer" && isActive && onCancel && canCancelCust && (
           <TouchableOpacity
             style={styles.cancelBtn}
             onPress={() =>

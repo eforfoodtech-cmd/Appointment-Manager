@@ -21,6 +21,7 @@ import {
   requireBarber,
   type AuthRequest,
 } from "../middlewares/auth";
+import { autoCompletePastAppointments } from "./appointments";
 
 const router = Router();
 
@@ -340,6 +341,7 @@ router.get(
       return;
     }
 
+    await autoCompletePastAppointments();
     // Get today's appointments with full details
     const todayAppts = await db
       .select({

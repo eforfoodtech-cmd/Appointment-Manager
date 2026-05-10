@@ -43,6 +43,31 @@ function getNowInIstanbul(): { date: string; minutesOfDay: number } {
   };
 }
 
+// Returns ms timestamp for "YYYY-MM-DD HH:MM" interpreted as Europe/Istanbul (UTC+3, no DST).
+function istanbulToMs(date: string, hhmm: string): number {
+  return new Date(`${date}T${hhmm}:00+03:00`).getTime();
+}
+
+// Lazy auto-complete: any pending/confirmed appointment whose slot end_time has passed
+// (Istanbul time) is auto-marked completed. Idempotent; safe to call frequently.
+export async function autoCompletePastAppointments(
+  txOrDb: { execute: (q: ReturnType<typeof sql>) => Promise<unknown> } = db,
+): Promise<void> {
+  const { date: nowDate, minutesOfDay: nowMin } = getNowInIstanbul();
+  const hh = String(Math.floor(nowMin / 60)).padStart(2, "0");
+  const mm = String(nowMin % 60).padStart(2, "0");
+  const nowHHMM = `${hh}:${mm}`;
+  await txOrDb.execute(sql`
+    UPDATE appointments SET status='completed', updated_at=NOW()
+    WHERE status IN ('pending','confirmed')
+      AND slot_id IN (
+        SELECT id FROM appointment_slots
+        WHERE date < ${nowDate}
+           OR (date = ${nowDate} AND end_time <= ${nowHHMM})
+      )
+  `);
+}
+
 // Build enriched appointment response
 async function getAppointmentById(id: number) {
   const [appt] = await db
@@ -82,6 +107,7 @@ async function getAppointmentById(id: number) {
 
 // ─── GET /api/appointments ───────────────────────────────────────────────────
 router.get("/", authenticate, async (req: AuthRequest, res) => {
+  await autoCompletePastAppointments();
   const user = req.user!;
   const date = req.query["date"] as string | undefined;
   const status = req.query["status"] as string | undefined;
@@ -193,6 +219,7 @@ router.post("/", authenticate, async (req: AuthRequest, res) => {
   }
 
   const result = await db.transaction(async (tx) => {
+    await autoCompletePastAppointments(tx);
     const [slot] = await tx
       .select()
       .from(appointmentSlotsTable)
@@ -317,6 +344,7 @@ router.post("/", authenticate, async (req: AuthRequest, res) => {
 
 // ─── GET /api/appointments/:id ───────────────────────────────────────────────
 router.get("/:id", authenticate, async (req: AuthRequest, res) => {
+  await autoCompletePastAppointments();
   const id = Number(req.params["id"]);
   const appt = await getAppointmentById(id);
 
@@ -332,6 +360,7 @@ router.get("/:id", authenticate, async (req: AuthRequest, res) => {
 router.patch("/:id", authenticate, async (req: AuthRequest, res) => {
   const id = Number(req.params["id"]);
   const { status, slotId: newSlotId, notes } = req.body;
+  const userRole = req.user!.role;
 
   const result = await db.transaction(async (tx) => {
     const [existing] = await tx
@@ -342,9 +371,98 @@ router.patch("/:id", authenticate, async (req: AuthRequest, res) => {
 
     if (!existing) return { status: 404 as const, error: "Randevu bulunamadı" };
 
+    // Ownership check: caller must own this appointment.
+    if (userRole === "customer") {
+      const [c] = await tx
+        .select({ id: customersTable.id })
+        .from(customersTable)
+        .where(eq(customersTable.userId, req.user!.id))
+        .limit(1);
+      if (!c || c.id !== existing.customerId) {
+        return { status: 403 as const, error: "Bu randevuya erişim yetkiniz yok" };
+      }
+    } else if (userRole === "barber") {
+      const [b] = await tx
+        .select({ id: barbersTable.id })
+        .from(barbersTable)
+        .where(eq(barbersTable.userId, req.user!.id))
+        .limit(1);
+      if (!b || b.id !== existing.barberId) {
+        return { status: 403 as const, error: "Bu randevuya erişim yetkiniz yok" };
+      }
+    }
+
+    // Guard: no_show only valid for active appointments
+    if (status === "no_show" && existing.status !== "pending" && existing.status !== "confirmed") {
+      return { status: 400 as const, error: "Bu randevu zaten kapatılmış" };
+    }
+
     const updates: Partial<typeof appointmentsTable.$inferInsert> = {};
     if (status) updates.status = status;
     if (notes !== undefined) updates.notes = notes;
+
+    // Time-gated transitions: load slot once for no_show / cancelled paths
+    if (status === "no_show" || status === "cancelled") {
+      const [s] = await tx
+        .select({
+          date: appointmentSlotsTable.date,
+          startTime: appointmentSlotsTable.startTime,
+        })
+        .from(appointmentSlotsTable)
+        .where(eq(appointmentSlotsTable.id, existing.slotId))
+        .limit(1);
+
+      if (!s) return { status: 404 as const, error: "Slot bulunamadı" };
+
+      const slotStartMs = istanbulToMs(s.date, s.startTime);
+      const nowMs = Date.now();
+
+      if (status === "no_show") {
+        if (nowMs < slotStartMs) {
+          return { status: 400 as const, error: "Randevu saati henüz gelmedi" };
+        }
+        // Idempotently create a 1-month no-show block for this barber/customer
+        const blocks = await tx
+          .select()
+          .from(noShowBlocksTable)
+          .where(
+            and(
+              eq(noShowBlocksTable.barberId, existing.barberId),
+              eq(noShowBlocksTable.customerId, existing.customerId),
+            ),
+          );
+        const now = new Date();
+        const hasActive = blocks.some(
+          (b) => !b.expiresAt || new Date(b.expiresAt) > now,
+        );
+        if (!hasActive) {
+          const exp = new Date();
+          exp.setMonth(exp.getMonth() + 1);
+          await tx.insert(noShowBlocksTable).values({
+            barberId: existing.barberId,
+            customerId: existing.customerId,
+            reason: "No-show",
+            expiresAt: exp,
+          });
+        }
+      }
+
+      if (status === "cancelled" && userRole === "customer") {
+        const diffMin = (slotStartMs - nowMs) / 60000;
+        if (diffMin <= 0) {
+          return {
+            status: 400 as const,
+            error: "Randevu saati geçtiği için iptal edemezsiniz.",
+          };
+        }
+        if (diffMin <= 5 * 60) {
+          return {
+            status: 400 as const,
+            error: "Randevuya 5 saatten az kaldığı için iptal edemezsiniz.",
+          };
+        }
+      }
+    }
 
     if (newSlotId && newSlotId !== existing.slotId) {
       const [newSlot] = await tx
