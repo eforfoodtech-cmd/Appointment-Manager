@@ -16,6 +16,7 @@ import {
   Platform,
   FlatList,
   Linking,
+  KeyboardAvoidingView,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
@@ -516,7 +517,17 @@ export default function SlotsScreen() {
 
       {/* Add slot modal */}
       <Modal visible={showAddModal} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
+          style={styles.modalOverlay}
+          keyboardVerticalOffset={0}
+        >
+          <ScrollView
+            keyboardShouldPersistTaps="handled"
+            contentContainerStyle={styles.addModalScroll}
+            showsVerticalScrollIndicator={false}
+            bounces={false}
+          >
           <View style={styles.addModalContent}>
             <Text style={styles.modalTitle}>Yeni Slot Ekle</Text>
             <Text style={styles.modalDate}>{selectedDate}</Text>
@@ -570,7 +581,8 @@ export default function SlotsScreen() {
               </TouchableOpacity>
             </View>
           </View>
-        </View>
+          </ScrollView>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* Customer detail modal */}
@@ -742,11 +754,16 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0,0,0,0.5)",
     justifyContent: "flex-end",
   },
+  addModalScroll: {
+    flexGrow: 1,
+    justifyContent: "flex-end",
+  },
   addModalContent: {
     backgroundColor: c.background,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     padding: 24,
+    paddingBottom: Platform.OS === "ios" ? 32 : 24,
     gap: 16,
   },
   modalTitle: { fontSize: 20, fontFamily: "Inter_700Bold", color: c.foreground },
