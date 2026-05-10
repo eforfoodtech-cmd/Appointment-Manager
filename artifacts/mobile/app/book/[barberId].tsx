@@ -68,6 +68,10 @@ export default function BookingScreen() {
       query: {
         enabled: !!barberId,
         queryKey: getGetBarberSlotsQueryKey(Number(barberId), { date: selectedDate }),
+        staleTime: 0,
+        refetchOnMount: true,
+        refetchOnWindowFocus: true,
+        refetchOnReconnect: true,
       },
     },
   );
