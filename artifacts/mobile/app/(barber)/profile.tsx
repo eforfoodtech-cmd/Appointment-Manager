@@ -34,6 +34,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/components/Toast";
 import colors from "@/constants/colors";
+import { formatTimeInput, normalizeTimeInput } from "@/utils/timeInput";
 
 const c = colors.light;
 
@@ -459,9 +460,12 @@ function DayScheduleRow({
                   <TextInput
                     style={styles.timeFieldInput}
                     value={row.startTime}
-                    onChangeText={(v) => onUpdate({ startTime: v })}
+                    onChangeText={(v) => onUpdate({ startTime: formatTimeInput(v) })}
+                    onBlur={() => onUpdate({ startTime: normalizeTimeInput(row.startTime) })}
                     placeholder="09:00"
                     placeholderTextColor={c.mutedForeground}
+                    keyboardType="number-pad"
+                    maxLength={5}
                   />
                 </View>
                 <View style={styles.timeField}>
@@ -469,9 +473,12 @@ function DayScheduleRow({
                   <TextInput
                     style={styles.timeFieldInput}
                     value={row.endTime}
-                    onChangeText={(v) => onUpdate({ endTime: v })}
+                    onChangeText={(v) => onUpdate({ endTime: formatTimeInput(v) })}
+                    onBlur={() => onUpdate({ endTime: normalizeTimeInput(row.endTime) })}
                     placeholder="22:00"
                     placeholderTextColor={c.mutedForeground}
+                    keyboardType="number-pad"
+                    maxLength={5}
                   />
                 </View>
               </View>

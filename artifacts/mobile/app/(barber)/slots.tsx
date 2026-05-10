@@ -35,6 +35,7 @@ import type { SlotAppointmentDetail } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/components/Toast";
 import colors from "@/constants/colors";
+import { formatTimeInput, normalizeTimeInput } from "@/utils/timeInput";
 
 const c = colors.light;
 
@@ -526,9 +527,12 @@ export default function SlotsScreen() {
                 <TextInput
                   style={styles.timeInput}
                   value={startTime}
-                  onChangeText={setStartTime}
+                  onChangeText={(v) => setStartTime(formatTimeInput(v))}
+                  onBlur={() => setStartTime(normalizeTimeInput(startTime))}
                   placeholder="09:00"
                   placeholderTextColor={c.mutedForeground}
+                  keyboardType="number-pad"
+                  maxLength={5}
                 />
               </View>
               <View style={{ flex: 1, gap: 6 }}>
@@ -536,9 +540,12 @@ export default function SlotsScreen() {
                 <TextInput
                   style={styles.timeInput}
                   value={endTime}
-                  onChangeText={setEndTime}
+                  onChangeText={(v) => setEndTime(formatTimeInput(v))}
+                  onBlur={() => setEndTime(normalizeTimeInput(endTime))}
                   placeholder="10:00"
                   placeholderTextColor={c.mutedForeground}
+                  keyboardType="number-pad"
+                  maxLength={5}
                 />
               </View>
             </View>
