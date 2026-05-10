@@ -30,7 +30,6 @@ import {
   useGetMyAvailability,
   useSetMyAvailability,
   getGetMyAvailabilityQueryKey,
-  useSeedWeekSlots,
 } from "@workspace/api-client-react";
 import type { SlotAppointmentDetail } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -270,18 +269,14 @@ export default function SlotsScreen() {
 
   // ── Weekly template helpers ────────────────────────────────────────────────
   const { showToast, ToastComponent } = useToast();
-  const seedWeek = useSeedWeekSlots();
   const setAvailability = useSetMyAvailability({
     mutation: {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: getGetMyAvailabilityQueryKey() });
-        seedWeek.mutate(undefined, {
-          onSuccess: () =>
-            queryClient.invalidateQueries({
-              predicate: (q) =>
-                typeof q.queryKey[0] === "string" &&
-                (q.queryKey[0] as string).includes("/slots"),
-            }),
+        queryClient.invalidateQueries({
+          predicate: (q) =>
+            typeof q.queryKey[0] === "string" &&
+            (q.queryKey[0] as string).includes("/slots"),
         });
         showToast("Haftalık şablon güncellendi", "success");
       },
