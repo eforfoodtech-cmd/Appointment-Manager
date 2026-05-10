@@ -1,0 +1,71 @@
+Şimdi sıradaki madde: Haftalık program son regression testi.
+
+Amaç:
+Haftalık program/availability değişince backend PUT içinde slot sync doğru çalışıyor mu, DB ve telefondaki slot ekranı aynı sonucu gösteriyor mu, son kez kontrol edeceğiz.
+
+Önce kod değiştirme. Sadece test yap ve raporla.
+
+Test edilecekler:
+
+1. Pazartesi slot_duration = 30 dk yap.
+   - Availability DB doğru mu?
+   - Appointment_slots doğru aralıklarla oluşuyor mu?
+   - Telefonda berber slot ekranında 30 dk slotlar görünüyor mu?
+
+2. Salı slot_duration = 45 dk yap.
+   - DB doğru mu?
+   - Slotlar 45 dk aralıklarla mı?
+   - Telefonda doğru mu?
+
+3. Çarşamba slot_duration = 60 dk yap.
+   - DB doğru mu?
+   - Slotlar 60 dk aralıklarla mı?
+   - Telefonda doğru mu?
+
+4. Perşembe slot_duration = 90 dk yap.
+   - DB doğru mu?
+   - Slotlar 90 dk aralıklarla mı?
+   - Telefonda doğru mu?
+
+5. Bir günü kapat.
+   - Availability is_open=false oluyor mu?
+   - O güne ait boş/unbooked slotlar siliniyor mu veya müşteri tarafında görünmüyor mu?
+   - Varsa booked slot korunuyor mu?
+   - Müşteri booking ekranında o gün slot görünmüyor mu?
+
+6. Aynı günü tekrar aç.
+   - Availability is_open=true oluyor mu?
+   - Slotlar seçilen duration’a göre tekrar oluşuyor mu?
+   - Berber tarafında görünüyor mu?
+   - Müşteri tarafında görünüyor mu?
+
+Kontrol edilecek SQL/DB noktaları:
+- availability tablosunda day_of_week, is_open, opening_time, closing_time, slot_duration
+- appointment_slots tablosunda ilgili tarihler için start_time/end_time dizilimi
+- duplicate slot var mı?
+- booked slot varsa korunuyor mu?
+- geçmiş slotlar etkileniyor mu?
+
+Önemli:
+- Yarınki demo randevusu appt 74 korunmalı.
+- Test sırasında aktif demo randevusunu bozma.
+- Gerekirse testleri appt 74'ün olmadığı günler/saatler üzerinde yap.
+- Kod değiştirme; sadece regression raporu çıkar.
+- Eğer bug bulursan önce raporla, patch yapma.
+
+Rapor formatı:
+Her gün için tablo ver:
+- Gün
+- Ayarlanan duration
+- Beklenen slot sayısı
+- DB’de oluşan slot sayısı
+- İlk 3 slot
+- Son 3 slot
+- Telefonda beklenen görünüm
+- Sonuç ✅/❌
+
+Sonunda genel sonuç:
+- Duplicate var mı?
+- Booked slot korundu mu?
+- Customer tarafında kapalı gün gizlendi mi?
+- Tekrar açınca slotlar doğru geldi mi?
