@@ -12,7 +12,7 @@ import {
   usersTable,
   noShowBlocksTable,
 } from "@workspace/db";
-import { eq, and, sql, gte, lte, inArray, not } from "drizzle-orm";
+import { eq, and, sql, inArray } from "drizzle-orm";
 import { authenticate, type AuthRequest } from "../middlewares/auth";
 
 const router = Router();
@@ -251,33 +251,25 @@ router.post("/", authenticate, async (req: AuthRequest, res) => {
         };
       }
 
-      const todayDate = new Date().toISOString().split("T")[0]!;
-      const limitDate = new Date(Date.now() + 6 * 24 * 60 * 60 * 1000)
-        .toISOString()
-        .split("T")[0]!;
-
-      const weeklyAppts = await tx
+      // One active appointment per (customer, barber). Active = pending|confirmed.
+      // Past statuses (completed, cancelled, no_show) do not block re-booking.
+      const activeAtBarber = await tx
         .select({ id: appointmentsTable.id })
         .from(appointmentsTable)
-        .innerJoin(
-          appointmentSlotsTable,
-          eq(appointmentSlotsTable.id, appointmentsTable.slotId),
-        )
         .where(
           and(
             eq(appointmentsTable.customerId, customerId),
-            not(inArray(appointmentsTable.status, ["cancelled"])),
-            gte(appointmentSlotsTable.date, todayDate),
-            lte(appointmentSlotsTable.date, limitDate),
+            eq(appointmentsTable.barberId, slot.barberId),
+            inArray(appointmentsTable.status, ["pending", "confirmed"]),
           ),
         )
         .limit(1);
 
-      if (weeklyAppts.length > 0) {
+      if (activeAtBarber.length > 0) {
         return {
-          status: 400 as const,
+          status: 409 as const,
           error:
-            "Bu hafta için zaten bir randevunuz var. Yeni randevu almak için mevcut randevunuzu iptal edin.",
+            "Bu berberde zaten aktif bir randevunuz var. Yeni randevu almak için mevcut randevunuzu iptal edin.",
         };
       }
     } else {
