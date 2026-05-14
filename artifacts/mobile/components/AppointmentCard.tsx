@@ -41,6 +41,7 @@ interface Appointment {
   customerName: string;
   customerPhone?: string | null;
   notes?: string | null;
+  isManual?: boolean;
 }
 
 interface Props {
@@ -91,9 +92,16 @@ export function AppointmentCard({
       {/* Content */}
       <View style={styles.content}>
         <View style={styles.topRow}>
-          <Text style={styles.name}>
-            {role === "barber" ? appt.customerName : appt.shopName}
-          </Text>
+          <View style={styles.nameRow}>
+            <Text style={styles.name} numberOfLines={1}>
+              {role === "barber" ? appt.customerName : appt.shopName}
+            </Text>
+            {role === "barber" && appt.isManual && (
+              <View style={styles.manualTag}>
+                <Text style={styles.manualTagText}>Manuel</Text>
+              </View>
+            )}
+          </View>
           <View style={[styles.badge, { backgroundColor: statusColor + "20" }]}>
             <Text style={[styles.badgeText, { color: statusColor }]}>
               {statusLabel}
@@ -204,7 +212,15 @@ const styles = StyleSheet.create({
   timeSep: { fontSize: 10, color: "rgba(255,255,255,0.7)" },
   content: { flex: 1, padding: 12, gap: 4 },
   topRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  name: { fontSize: 15, fontFamily: "Inter_600SemiBold", color: c.foreground, flex: 1 },
+  nameRow: { flex: 1, flexDirection: "row", alignItems: "center", gap: 6, minWidth: 0 },
+  name: { fontSize: 15, fontFamily: "Inter_600SemiBold", color: c.foreground, flexShrink: 1 },
+  manualTag: {
+    backgroundColor: "#EDE9FE",
+    borderRadius: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  manualTagText: { fontSize: 10, fontFamily: "Inter_600SemiBold", color: "#7C3AED" },
   badge: { borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
   badgeText: { fontSize: 11, fontFamily: "Inter_600SemiBold" },
   sub: { fontSize: 12, fontFamily: "Inter_400Regular", color: c.mutedForeground },

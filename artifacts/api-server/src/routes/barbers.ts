@@ -357,8 +357,9 @@ router.get(
         endTime: appointmentSlotsTable.endTime,
         barberName: usersTable.name,
         shopName: barbersTable.shopName,
-        customerName: sql<string>`cu.name`,
-        customerPhone: sql<string>`cu.phone`,
+        customerName: sql<string>`COALESCE(cu.name, ${appointmentsTable.manualCustomerName}, '')`,
+        customerPhone: sql<string | null>`cu.phone`,
+        isManual: sql<boolean>`(${appointmentsTable.customerId} IS NULL)`,
       })
       .from(appointmentsTable)
       .innerJoin(
@@ -367,11 +368,11 @@ router.get(
       )
       .innerJoin(barbersTable, eq(barbersTable.id, appointmentsTable.barberId))
       .innerJoin(usersTable, eq(usersTable.id, barbersTable.userId))
-      .innerJoin(
+      .leftJoin(
         customersTable,
         eq(customersTable.id, appointmentsTable.customerId),
       )
-      .innerJoin(
+      .leftJoin(
         sql`users cu`,
         sql`cu.id = ${customersTable.userId}`,
       )
@@ -1065,8 +1066,9 @@ router.get("/:barberId/slots", async (req, res) => {
       appointmentId: appointmentsTable.id,
       appointmentNotes: appointmentsTable.notes,
       appointmentStatus: appointmentsTable.status,
-      customerName: sql<string>`cu.name`,
-      customerPhone: sql<string>`cu.phone`,
+      appointmentCustomerId: appointmentsTable.customerId,
+      customerName: sql<string>`COALESCE(cu.name, ${appointmentsTable.manualCustomerName}, '')`,
+      customerPhone: sql<string | null>`cu.phone`,
     })
     .from(appointmentSlotsTable)
     .leftJoin(
@@ -1102,6 +1104,7 @@ router.get("/:barberId/slots", async (req, res) => {
             status: r.appointmentStatus,
             customerName: r.customerName,
             customerPhone: r.customerPhone,
+            isManual: r.appointmentCustomerId == null,
           }
         : null,
   }));

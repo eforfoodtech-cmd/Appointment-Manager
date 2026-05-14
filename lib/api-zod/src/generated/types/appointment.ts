@@ -11,7 +11,7 @@ export interface Appointment {
   id: number;
   slotId: number;
   barberId: number;
-  customerId: number;
+  customerId?: number | null;
   status: AppointmentStatus;
   notes?: string | null;
   date: Date;
@@ -21,5 +21,7 @@ export interface Appointment {
   shopName: string;
   customerName: string;
   customerPhone?: string | null;
+  /** True if appointment was added manually by barber (no app customer) */
+  isManual: boolean;
   createdAt: Date;
 }

@@ -242,6 +242,11 @@ export const GetBarberSlotsResponseItem = zod.object({
       status: zod.string(),
       customerName: zod.string(),
       customerPhone: zod.string().nullish(),
+      isManual: zod
+        .boolean()
+        .describe(
+          "True if appointment was added manually by barber (no app customer)",
+        ),
     })
     .nullish(),
 });
@@ -283,6 +288,11 @@ export const UpdateSlotResponse = zod.object({
       status: zod.string(),
       customerName: zod.string(),
       customerPhone: zod.string().nullish(),
+      isManual: zod
+        .boolean()
+        .describe(
+          "True if appointment was added manually by barber (no app customer)",
+        ),
     })
     .nullish(),
 });
@@ -308,7 +318,7 @@ export const ListAppointmentsResponseItem = zod.object({
   id: zod.number(),
   slotId: zod.number(),
   barberId: zod.number(),
-  customerId: zod.number(),
+  customerId: zod.number().nullish(),
   status: zod.enum([
     "pending",
     "confirmed",
@@ -324,6 +334,11 @@ export const ListAppointmentsResponseItem = zod.object({
   shopName: zod.string(),
   customerName: zod.string(),
   customerPhone: zod.string().nullish(),
+  isManual: zod
+    .boolean()
+    .describe(
+      "True if appointment was added manually by barber (no app customer)",
+    ),
   createdAt: zod.coerce.date(),
 });
 export const ListAppointmentsResponse = zod.array(ListAppointmentsResponseItem);
@@ -338,6 +353,12 @@ export const CreateAppointmentBody = zod.object({
     .number()
     .optional()
     .describe("Optional — barber can specify a customer when booking manually"),
+  manualCustomerName: zod
+    .string()
+    .optional()
+    .describe(
+      "Barber-only — create a manual appointment with just a name (no app customer)",
+    ),
 });
 
 /**
@@ -351,7 +372,7 @@ export const GetAppointmentResponse = zod.object({
   id: zod.number(),
   slotId: zod.number(),
   barberId: zod.number(),
-  customerId: zod.number(),
+  customerId: zod.number().nullish(),
   status: zod.enum([
     "pending",
     "confirmed",
@@ -367,6 +388,11 @@ export const GetAppointmentResponse = zod.object({
   shopName: zod.string(),
   customerName: zod.string(),
   customerPhone: zod.string().nullish(),
+  isManual: zod
+    .boolean()
+    .describe(
+      "True if appointment was added manually by barber (no app customer)",
+    ),
   createdAt: zod.coerce.date(),
 });
 
@@ -389,7 +415,7 @@ export const UpdateAppointmentResponse = zod.object({
   id: zod.number(),
   slotId: zod.number(),
   barberId: zod.number(),
-  customerId: zod.number(),
+  customerId: zod.number().nullish(),
   status: zod.enum([
     "pending",
     "confirmed",
@@ -405,6 +431,11 @@ export const UpdateAppointmentResponse = zod.object({
   shopName: zod.string(),
   customerName: zod.string(),
   customerPhone: zod.string().nullish(),
+  isManual: zod
+    .boolean()
+    .describe(
+      "True if appointment was added manually by barber (no app customer)",
+    ),
   createdAt: zod.coerce.date(),
 });
 
@@ -482,7 +513,7 @@ export const GetBarberDashboardResponse = zod.object({
       id: zod.number(),
       slotId: zod.number(),
       barberId: zod.number(),
-      customerId: zod.number(),
+      customerId: zod.number().nullish(),
       status: zod.enum([
         "pending",
         "confirmed",
@@ -498,6 +529,11 @@ export const GetBarberDashboardResponse = zod.object({
       shopName: zod.string(),
       customerName: zod.string(),
       customerPhone: zod.string().nullish(),
+      isManual: zod
+        .boolean()
+        .describe(
+          "True if appointment was added manually by barber (no app customer)",
+        ),
       createdAt: zod.coerce.date(),
     }),
   ),
@@ -506,7 +542,7 @@ export const GetBarberDashboardResponse = zod.object({
       id: zod.number(),
       slotId: zod.number(),
       barberId: zod.number(),
-      customerId: zod.number(),
+      customerId: zod.number().nullish(),
       status: zod.enum([
         "pending",
         "confirmed",
@@ -522,6 +558,11 @@ export const GetBarberDashboardResponse = zod.object({
       shopName: zod.string(),
       customerName: zod.string(),
       customerPhone: zod.string().nullish(),
+      isManual: zod
+        .boolean()
+        .describe(
+          "True if appointment was added manually by barber (no app customer)",
+        ),
       createdAt: zod.coerce.date(),
     })
     .nullish(),
@@ -534,7 +575,7 @@ export const GetUpcomingAppointmentsResponseItem = zod.object({
   id: zod.number(),
   slotId: zod.number(),
   barberId: zod.number(),
-  customerId: zod.number(),
+  customerId: zod.number().nullish(),
   status: zod.enum([
     "pending",
     "confirmed",
@@ -550,6 +591,11 @@ export const GetUpcomingAppointmentsResponseItem = zod.object({
   shopName: zod.string(),
   customerName: zod.string(),
   customerPhone: zod.string().nullish(),
+  isManual: zod
+    .boolean()
+    .describe(
+      "True if appointment was added manually by barber (no app customer)",
+    ),
   createdAt: zod.coerce.date(),
 });
 export const GetUpcomingAppointmentsResponse = zod.array(

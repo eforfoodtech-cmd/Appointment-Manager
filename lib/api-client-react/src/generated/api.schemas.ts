@@ -117,6 +117,8 @@ export interface SlotAppointmentDetail {
   status: string;
   customerName: string;
   customerPhone?: string | null;
+  /** True if appointment was added manually by barber (no app customer) */
+  isManual: boolean;
 }
 
 export interface AppointmentSlot {
@@ -158,7 +160,7 @@ export interface Appointment {
   id: number;
   slotId: number;
   barberId: number;
-  customerId: number;
+  customerId?: number | null;
   status: AppointmentStatus;
   notes?: string | null;
   date: string;
@@ -168,6 +170,8 @@ export interface Appointment {
   shopName: string;
   customerName: string;
   customerPhone?: string | null;
+  /** True if appointment was added manually by barber (no app customer) */
+  isManual: boolean;
   createdAt: string;
 }
 
@@ -176,6 +180,8 @@ export interface CreateAppointmentRequest {
   notes?: string;
   /** Optional — barber can specify a customer when booking manually */
   customerId?: number;
+  /** Barber-only — create a manual appointment with just a name (no app customer) */
+  manualCustomerName?: string;
 }
 
 export interface UpdateAppointmentRequest {

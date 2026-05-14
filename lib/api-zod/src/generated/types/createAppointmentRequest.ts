@@ -11,4 +11,6 @@ export interface CreateAppointmentRequest {
   notes?: string;
   /** Optional — barber can specify a customer when booking manually */
   customerId?: number;
+  /** Barber-only — create a manual appointment with just a name (no app customer) */
+  manualCustomerName?: string;
 }

@@ -84,8 +84,9 @@ async function getAppointmentById(id: number) {
       endTime: appointmentSlotsTable.endTime,
       barberName: usersTable.name,
       shopName: barbersTable.shopName,
-      customerName: sql<string>`cu.name`,
-      customerPhone: sql<string>`cu.phone`,
+      customerName: sql<string>`COALESCE(cu.name, ${appointmentsTable.manualCustomerName}, '')`,
+      customerPhone: sql<string | null>`cu.phone`,
+      isManual: sql<boolean>`(${appointmentsTable.customerId} IS NULL)`,
     })
     .from(appointmentsTable)
     .innerJoin(
@@ -94,11 +95,11 @@ async function getAppointmentById(id: number) {
     )
     .innerJoin(barbersTable, eq(barbersTable.id, appointmentsTable.barberId))
     .innerJoin(usersTable, eq(usersTable.id, barbersTable.userId))
-    .innerJoin(
+    .leftJoin(
       customersTable,
       eq(customersTable.id, appointmentsTable.customerId),
     )
-    .innerJoin(sql`users cu`, sql`cu.id = ${customersTable.userId}`)
+    .leftJoin(sql`users cu`, sql`cu.id = ${customersTable.userId}`)
     .where(eq(appointmentsTable.id, id))
     .limit(1);
 
@@ -187,8 +188,9 @@ router.get("/", authenticate, async (req: AuthRequest, res) => {
       endTime: appointmentSlotsTable.endTime,
       barberName: usersTable.name,
       shopName: barbersTable.shopName,
-      customerName: sql<string>`cu.name`,
-      customerPhone: sql<string>`cu.phone`,
+      customerName: sql<string>`COALESCE(cu.name, ${appointmentsTable.manualCustomerName}, '')`,
+      customerPhone: sql<string | null>`cu.phone`,
+      isManual: sql<boolean>`(${appointmentsTable.customerId} IS NULL)`,
     })
     .from(appointmentsTable)
     .innerJoin(
@@ -197,11 +199,11 @@ router.get("/", authenticate, async (req: AuthRequest, res) => {
     )
     .innerJoin(barbersTable, eq(barbersTable.id, appointmentsTable.barberId))
     .innerJoin(usersTable, eq(usersTable.id, barbersTable.userId))
-    .innerJoin(
+    .leftJoin(
       customersTable,
       eq(customersTable.id, appointmentsTable.customerId),
     )
-    .innerJoin(sql`users cu`, sql`cu.id = ${customersTable.userId}`)
+    .leftJoin(sql`users cu`, sql`cu.id = ${customersTable.userId}`)
     .where(and(...whereConditions))
     .orderBy(appointmentSlotsTable.date, appointmentSlotsTable.startTime);
 
@@ -211,10 +213,25 @@ router.get("/", authenticate, async (req: AuthRequest, res) => {
 // ─── POST /api/appointments ──────────────────────────────────────────────────
 router.post("/", authenticate, async (req: AuthRequest, res) => {
   const user = req.user!;
-  const { slotId, notes, customerId: manualCustomerId } = req.body;
+  const {
+    slotId,
+    notes,
+    customerId: manualCustomerId,
+    manualCustomerName: manualNameRaw,
+  } = req.body;
 
   if (!slotId) {
     res.status(400).json({ error: "slotId zorunludur" });
+    return;
+  }
+
+  const manualCustomerName =
+    typeof manualNameRaw === "string" ? manualNameRaw.trim() : "";
+  const isManualByName =
+    user.role === "barber" && manualCustomerName.length > 0;
+
+  if (user.role === "barber" && !manualCustomerId && !isManualByName) {
+    res.status(400).json({ error: "Müşteri adı zorunlu" });
     return;
   }
 
@@ -232,6 +249,18 @@ router.post("/", authenticate, async (req: AuthRequest, res) => {
       return { status: 400 as const, error: "Bu slot müsait değil" };
     }
 
+    // Barber-only: cannot book for another barber's slot
+    if (user.role === "barber") {
+      const [b] = await tx
+        .select({ id: barbersTable.id })
+        .from(barbersTable)
+        .where(eq(barbersTable.userId, user.id))
+        .limit(1);
+      if (!b || b.id !== slot.barberId) {
+        return { status: 403 as const, error: "Bu slota randevu ekleyemezsiniz" };
+      }
+    }
+
     const { date: nowDate, minutesOfDay: nowMinutes } = getNowInIstanbul();
     if (
       slot.date < nowDate ||
@@ -240,9 +269,11 @@ router.post("/", authenticate, async (req: AuthRequest, res) => {
       return { status: 400 as const, error: "Bu randevu saati artık alınamaz" };
     }
 
-    let customerId: number;
+    let customerId: number | null = null;
 
-    if (user.role === "barber" && manualCustomerId) {
+    if (user.role === "barber" && isManualByName) {
+      customerId = null; // manual appointment, name only
+    } else if (user.role === "barber" && manualCustomerId) {
       customerId = manualCustomerId;
     } else if (user.role === "customer") {
       const [customer] = await tx
@@ -309,6 +340,7 @@ router.post("/", authenticate, async (req: AuthRequest, res) => {
         slotId,
         barberId: slot.barberId,
         customerId,
+        manualCustomerName: isManualByName ? manualCustomerName : null,
         status: "confirmed",
         notes: notes || null,
       })
@@ -351,6 +383,30 @@ router.get("/:id", authenticate, async (req: AuthRequest, res) => {
   if (!appt) {
     res.status(404).json({ error: "Randevu bulunamadı" });
     return;
+  }
+
+  // Ownership check: caller must own this appointment.
+  const userRole = req.user!.role;
+  if (userRole === "customer") {
+    const [c] = await db
+      .select({ id: customersTable.id })
+      .from(customersTable)
+      .where(eq(customersTable.userId, req.user!.id))
+      .limit(1);
+    if (!c || c.id !== appt.customerId) {
+      res.status(403).json({ error: "Bu randevuya erişim yetkiniz yok" });
+      return;
+    }
+  } else if (userRole === "barber") {
+    const [b] = await db
+      .select({ id: barbersTable.id })
+      .from(barbersTable)
+      .where(eq(barbersTable.userId, req.user!.id))
+      .limit(1);
+    if (!b || b.id !== appt.barberId) {
+      res.status(403).json({ error: "Bu randevuya erişim yetkiniz yok" });
+      return;
+    }
   }
 
   res.json(appt);
@@ -421,29 +477,33 @@ router.patch("/:id", authenticate, async (req: AuthRequest, res) => {
         if (nowMs < slotStartMs) {
           return { status: 400 as const, error: "Randevu saati henüz gelmedi" };
         }
-        // Idempotently create a 1-month no-show block for this barber/customer
-        const blocks = await tx
-          .select()
-          .from(noShowBlocksTable)
-          .where(
-            and(
-              eq(noShowBlocksTable.barberId, existing.barberId),
-              eq(noShowBlocksTable.customerId, existing.customerId),
-            ),
+        // Manual appointments have no app customer → just mark status, no block
+        if (existing.customerId != null) {
+          const existingCustomerId = existing.customerId;
+          // Idempotently create a 1-month no-show block for this barber/customer
+          const blocks = await tx
+            .select()
+            .from(noShowBlocksTable)
+            .where(
+              and(
+                eq(noShowBlocksTable.barberId, existing.barberId),
+                eq(noShowBlocksTable.customerId, existingCustomerId),
+              ),
+            );
+          const now = new Date();
+          const hasActive = blocks.some(
+            (b) => !b.expiresAt || new Date(b.expiresAt) > now,
           );
-        const now = new Date();
-        const hasActive = blocks.some(
-          (b) => !b.expiresAt || new Date(b.expiresAt) > now,
-        );
-        if (!hasActive) {
-          const exp = new Date();
-          exp.setMonth(exp.getMonth() + 1);
-          await tx.insert(noShowBlocksTable).values({
-            barberId: existing.barberId,
-            customerId: existing.customerId,
-            reason: "No-show",
-            expiresAt: exp,
-          });
+          if (!hasActive) {
+            const exp = new Date();
+            exp.setMonth(exp.getMonth() + 1);
+            await tx.insert(noShowBlocksTable).values({
+              barberId: existing.barberId,
+              customerId: existingCustomerId,
+              reason: "No-show",
+              expiresAt: exp,
+            });
+          }
         }
       }
 

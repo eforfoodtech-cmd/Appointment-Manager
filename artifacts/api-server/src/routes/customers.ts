@@ -53,7 +53,8 @@ router.get(
         barberName: usersTable.name,
         shopName: barbersTable.shopName,
         customerName: sql<string>`cu.name`,
-        customerPhone: sql<string>`cu.phone`,
+        customerPhone: sql<string | null>`cu.phone`,
+        isManual: sql<boolean>`false`,
       })
       .from(appointmentsTable)
       .innerJoin(

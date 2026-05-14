@@ -821,10 +821,14 @@ components:
         customerPhone:
           type: string
           nullable: true
+        isManual:
+          type: boolean
+          description: True if appointment was added manually by barber (no app customer)
       required:
         - id
         - status
         - customerName
+        - isManual
 
     AppointmentSlot:
       type: object
@@ -896,6 +900,7 @@ components:
           type: integer
         customerId:
           type: integer
+          nullable: true
         status:
           $ref: "#/components/schemas/AppointmentStatus"
         notes:
@@ -917,6 +922,9 @@ components:
         customerPhone:
           type: string
           nullable: true
+        isManual:
+          type: boolean
+          description: True if appointment was added manually by barber (no app customer)
         createdAt:
           type: string
           format: date-time
@@ -924,7 +932,6 @@ components:
         - id
         - slotId
         - barberId
-        - customerId
         - status
         - date
         - startTime
@@ -932,6 +939,7 @@ components:
         - barberName
         - shopName
         - customerName
+        - isManual
         - createdAt
 
     CreateAppointmentRequest:
@@ -944,6 +952,9 @@ components:
         customerId:
           type: integer
           description: Optional — barber can specify a customer when booking manually
+        manualCustomerName:
+          type: string
+          description: Barber-only — create a manual appointment with just a name (no app customer)
       required:
         - slotId
 

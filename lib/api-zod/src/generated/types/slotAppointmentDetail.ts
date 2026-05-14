@@ -12,4 +12,6 @@ export interface SlotAppointmentDetail {
   status: string;
   customerName: string;
   customerPhone?: string | null;
+  /** True if appointment was added manually by barber (no app customer) */
+  isManual: boolean;
 }

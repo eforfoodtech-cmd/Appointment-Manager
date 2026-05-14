@@ -31,6 +31,7 @@ import {
   useGetMyAvailability,
   useSetMyAvailability,
   getGetMyAvailabilityQueryKey,
+  useCreateAppointment,
 } from "@workspace/api-client-react";
 import type { SlotAppointmentDetail } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -189,6 +190,12 @@ export default function SlotsScreen() {
     appointment: SlotAppointmentDetail;
   } | null>(null);
 
+  const [manualSlot, setManualSlot] = useState<{
+    slotId: number;
+    time: string;
+  } | null>(null);
+  const [manualName, setManualName] = useState("");
+
   const { data: profile } = useGetMyBarberProfile();
   const barberId = profile?.id;
 
@@ -271,6 +278,20 @@ export default function SlotsScreen() {
 
   // ── Weekly template helpers ────────────────────────────────────────────────
   const { showToast, ToastComponent } = useToast();
+
+  const createManualAppt = useCreateAppointment({
+    mutation: {
+      onSuccess: () => {
+        invalidateSlots();
+        setManualSlot(null);
+        setManualName("");
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        showToast("Manuel randevu eklendi", "success");
+      },
+      onError: (err: any) =>
+        Alert.alert("Hata", err?.data?.error ?? "Randevu oluşturulamadı"),
+    },
+  });
   const setAvailability = useSetMyAvailability({
     mutation: {
       onSuccess: () => {
@@ -339,11 +360,19 @@ export default function SlotsScreen() {
     ]);
   };
 
-  const handleSlotPress = (slot: { startTime: string; endTime: string; isBooked: boolean; appointment?: SlotAppointmentDetail | null }) => {
+  const handleSlotPress = (slot: { id: number; startTime: string; endTime: string; isBooked: boolean; isAvailable: boolean; appointment?: SlotAppointmentDetail | null }) => {
     if (slot.isBooked && slot.appointment) {
       setDetailSlot({
         time: `${slot.startTime} – ${slot.endTime}`,
         appointment: slot.appointment,
+      });
+      return;
+    }
+    if (!slot.isBooked && slot.isAvailable && !isPastSlot(slot.startTime)) {
+      setManualName("");
+      setManualSlot({
+        slotId: slot.id,
+        time: `${slot.startTime} – ${slot.endTime}`,
       });
     }
   };
@@ -419,14 +448,14 @@ export default function SlotsScreen() {
             const isPast = isPastSlot(slot.startTime);
             return (
               <TouchableOpacity
-                activeOpacity={slot.isBooked ? 0.7 : 1}
+                activeOpacity={0.7}
                 onPress={() => handleSlotPress(slot)}
-                disabled={!slot.isBooked}
+                disabled={!slot.isBooked && (!slot.isAvailable || isPast)}
               >
                 <View
                   style={[
                     styles.slotRow,
-                    slot.isBooked && !isPast && styles.slotRowBooked,
+                    slot.isBooked && !isPast && (slot.appointment?.isManual ? styles.slotRowManual : styles.slotRowBooked),
                     slot.isBooked && isPast && styles.slotRowPastBooked,
                     !slot.isBooked && !slot.isAvailable && styles.slotRowClosed,
                     !slot.isBooked && isPast && styles.slotRowPast,
@@ -453,9 +482,29 @@ export default function SlotsScreen() {
                   {/* Status / customer */}
                   {slot.isBooked ? (
                     <View style={styles.bookedInfo}>
-                      <View style={isPast ? styles.badgePast : styles.badgeBooked}>
-                        <Text style={isPast ? styles.badgePastText : styles.badgeBookedText}>
-                          {isPast ? "Başladı" : "Dolu"}
+                      <View
+                        style={
+                          isPast
+                            ? styles.badgePast
+                            : slot.appointment?.isManual
+                              ? styles.badgeManual
+                              : styles.badgeBooked
+                        }
+                      >
+                        <Text
+                          style={
+                            isPast
+                              ? styles.badgePastText
+                              : slot.appointment?.isManual
+                                ? styles.badgeManualText
+                                : styles.badgeBookedText
+                          }
+                        >
+                          {isPast
+                            ? "Başladı"
+                            : slot.appointment?.isManual
+                              ? "Manuel"
+                              : "Dolu"}
                         </Text>
                       </View>
                       {slot.appointment && (
@@ -593,6 +642,73 @@ export default function SlotsScreen() {
         onClose={() => setDetailSlot(null)}
       />
 
+      {/* Manual booking modal */}
+      <Modal
+        visible={manualSlot !== null}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setManualSlot(null)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
+          style={styles.modalOverlay}
+        >
+          <TouchableOpacity
+            style={styles.modalBackdrop}
+            activeOpacity={1}
+            onPress={() => setManualSlot(null)}
+          />
+          <View style={styles.manualModal}>
+            <View style={styles.manualHeader}>
+              <Feather name="user-plus" size={20} color="#7C3AED" />
+              <Text style={styles.manualTitle}>Manuel Randevu</Text>
+            </View>
+            <Text style={styles.manualSubtitle}>{manualSlot?.time ?? ""}</Text>
+            <Text style={styles.manualLabel}>Müşteri Adı</Text>
+            <TextInput
+              style={styles.manualInput}
+              value={manualName}
+              onChangeText={setManualName}
+              placeholder="Ad Soyad"
+              placeholderTextColor={c.mutedForeground}
+              autoFocus
+              returnKeyType="done"
+            />
+            <View style={styles.manualActions}>
+              <TouchableOpacity
+                style={styles.modalCancel}
+                onPress={() => setManualSlot(null)}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.modalCancelText}>İptal</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.manualConfirm}
+                onPress={() => {
+                  const name = manualName.trim();
+                  if (!name) {
+                    Alert.alert("Hata", "Müşteri adı zorunlu");
+                    return;
+                  }
+                  if (!manualSlot) return;
+                  createManualAppt.mutate({
+                    data: { slotId: manualSlot.slotId, manualCustomerName: name },
+                  });
+                }}
+                activeOpacity={0.8}
+                disabled={createManualAppt.isPending}
+              >
+                {createManualAppt.isPending ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <Text style={styles.modalConfirmText}>Ekle</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
       {ToastComponent}
     </View>
   );
@@ -656,6 +772,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   slotRowBooked: { backgroundColor: c.primary + "18", borderColor: c.primary + "60" },
+  slotRowManual: { backgroundColor: "#EDE9FE", borderColor: "#7C3AED" + "60" },
   slotRowClosed: { backgroundColor: c.secondary, opacity: 0.75 },
   slotRowPast: { backgroundColor: "#F9FAFB", borderColor: "#E5E7EB", opacity: 0.75 },
   slotRowPastBooked: { backgroundColor: "#F3F4F6", borderColor: "#E5E7EB" },
@@ -695,6 +812,15 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   badgeBookedText: { fontSize: 12, fontFamily: "Inter_600SemiBold", color: c.primary },
+  badgeManual: {
+    backgroundColor: "#EDE9FE",
+    borderRadius: 6,
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    alignSelf: "center",
+    marginRight: 8,
+  },
+  badgeManualText: { fontSize: 12, fontFamily: "Inter_600SemiBold", color: "#7C3AED" },
   badgePast: {
     backgroundColor: "#F3F4F6",
     borderRadius: 6,
@@ -799,6 +925,39 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   modalConfirmText: { fontSize: 15, fontFamily: "Inter_600SemiBold", color: "#fff" },
+
+  modalBackdrop: { ...StyleSheet.absoluteFillObject },
+  manualModal: {
+    backgroundColor: c.background,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 24,
+    paddingBottom: Platform.OS === "ios" ? 32 : 24,
+    gap: 12,
+  },
+  manualHeader: { flexDirection: "row", alignItems: "center", gap: 8 },
+  manualTitle: { fontSize: 18, fontFamily: "Inter_700Bold", color: c.foreground },
+  manualSubtitle: { fontSize: 14, fontFamily: "Inter_500Medium", color: c.mutedForeground, marginTop: -4 },
+  manualLabel: { fontSize: 13, fontFamily: "Inter_500Medium", color: c.mutedForeground, marginTop: 8 },
+  manualInput: {
+    backgroundColor: c.card,
+    borderRadius: colors.radius,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    fontSize: 16,
+    fontFamily: "Inter_500Medium",
+    color: c.foreground,
+    borderWidth: 1,
+    borderColor: c.border,
+  },
+  manualActions: { flexDirection: "row", gap: 12, marginTop: 8 },
+  manualConfirm: {
+    flex: 1,
+    backgroundColor: "#7C3AED",
+    borderRadius: colors.radius,
+    paddingVertical: 14,
+    alignItems: "center",
+  },
 
   // Customer detail modal
   detailModal: {
