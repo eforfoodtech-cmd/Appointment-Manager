@@ -71,7 +71,7 @@ function getNowIstanbul() {
 }
 
 const STATUS_LABELS: Record<string, string> = {
-  pending: "Beklemede",
+  pending: "Bekliyor",
   confirmed: "Onaylandı",
   completed: "Tamamlandı",
   cancelled: "İptal",
@@ -220,7 +220,7 @@ export default function SlotsScreen() {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       },
       onError: (err: any) =>
-        Alert.alert("Hata", err?.data?.error ?? "Slot oluşturulamadı"),
+        Alert.alert("Hata", err?.data?.error ?? "Saat aralığı eklenemedi"),
     },
   });
 
@@ -242,7 +242,7 @@ export default function SlotsScreen() {
       onError: (err: any, _vars, ctx: any) => {
         if (slotsQueryKey && ctx?.prev !== undefined)
           queryClient.setQueryData(slotsQueryKey, ctx.prev);
-        Alert.alert("Hata", err?.data?.error ?? "Slot güncellenemedi");
+        Alert.alert("Hata", err?.data?.error ?? "Saat aralığı güncellenemedi");
       },
       onSettled: () => invalidateSlots(),
     },
@@ -263,7 +263,7 @@ export default function SlotsScreen() {
       onError: (err: any, _vars, ctx: any) => {
         if (slotsQueryKey && ctx?.prev !== undefined)
           queryClient.setQueryData(slotsQueryKey, ctx.prev);
-        Alert.alert("Hata", err?.data?.error ?? "Slot silinemedi");
+        Alert.alert("Hata", err?.data?.error ?? "Saat aralığı silinemedi");
       },
       onSettled: () => invalidateSlots(),
     },
@@ -280,10 +280,10 @@ export default function SlotsScreen() {
             typeof q.queryKey[0] === "string" &&
             (q.queryKey[0] as string).includes("/slots"),
         });
-        showToast("Haftalık şablon güncellendi", "success");
+        showToast("Haftalık program güncellendi", "success");
       },
       onError: (err: any) =>
-        showToast(err?.data?.error ?? "Şablon güncellenemedi", "error"),
+        showToast(err?.data?.error ?? "Program güncellenemedi", "error"),
     },
   });
 
@@ -329,7 +329,7 @@ export default function SlotsScreen() {
   };
 
   const handleDelete = (slotId: number) => {
-    Alert.alert("Sil", "Bu slotu silmek istediğinizden emin misiniz?", [
+    Alert.alert("Sil", "Bu saat aralığını silmek istediğinizden emin misiniz?", [
       { text: "İptal", style: "cancel" },
       {
         text: "Sil",
@@ -362,7 +362,7 @@ export default function SlotsScreen() {
     <View style={[styles.container, { paddingTop }]}>
       {/* Title */}
       <View style={styles.titleRow}>
-        <Text style={styles.title}>Slotlar</Text>
+        <Text style={styles.title}>Saat Aralıkları</Text>
         <TouchableOpacity
           style={styles.addBtn}
           onPress={() => setShowAddModal(true)}
@@ -412,7 +412,7 @@ export default function SlotsScreen() {
           ListEmptyComponent={
             <View style={styles.empty}>
               <Feather name="clock" size={40} color={c.border} />
-              <Text style={styles.emptyText}>Bu gün için slot yok</Text>
+              <Text style={styles.emptyText}>Bu gün için saat aralığı yok</Text>
             </View>
           }
           renderItem={({ item: slot }) => {
@@ -529,7 +529,7 @@ export default function SlotsScreen() {
             bounces={false}
           >
           <View style={styles.addModalContent}>
-            <Text style={styles.modalTitle}>Yeni Slot Ekle</Text>
+            <Text style={styles.modalTitle}>Yeni Saat Aralığı Ekle</Text>
             <Text style={styles.modalDate}>{selectedDate}</Text>
 
             <View style={styles.timeRow}>
@@ -707,14 +707,14 @@ const styles = StyleSheet.create({
   badgeClosed: {
     flex: 1,
     minWidth: 0,
-    backgroundColor: c.secondary,
+    backgroundColor: "#FEF3C7",
     borderRadius: 6,
     paddingVertical: 4,
     paddingHorizontal: 10,
     alignSelf: "center",
     marginRight: 8,
   },
-  badgeClosedText: { fontSize: 12, fontFamily: "Inter_600SemiBold", color: c.mutedForeground },
+  badgeClosedText: { fontSize: 12, fontFamily: "Inter_600SemiBold", color: "#92400E" },
 
   slotActions: { flexDirection: "row", gap: 4, flexShrink: 0 },
   iconBtn: {

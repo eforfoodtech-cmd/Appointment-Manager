@@ -46,8 +46,16 @@ export default function RegisterScreen() {
   });
 
   const handleRegister = () => {
-    if (!name.trim() || phone.length !== 10 || !password.trim()) {
+    if (!name.trim()) {
+      Alert.alert("Hata", "Ad Soyad zorunlu");
+      return;
+    }
+    if (phone.length !== 10) {
       Alert.alert("Hata", "Telefon numarası 10 haneli olmalı");
+      return;
+    }
+    if (!password.trim()) {
+      Alert.alert("Hata", "Şifre zorunlu");
       return;
     }
     if (!PIN_RE.test(password)) {

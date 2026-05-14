@@ -1,0 +1,64 @@
+8. UI küçük temizlikler için "hemen yapılmalı" listesini uygulayalım.
+Ek olarak demo sonrası listesinden C ve F maddelerini de bu patch'e alalım.
+
+Büyük redesign yapma. Sadece küçük metin/renk/validation polish.
+
+Yapılacaklar:
+
+1. (barber)/profile.tsx
+"Seed-week bu programa göre yeni günler oluşturur."
+metnini değiştir:
+"Bu program haftalık otomatik takvim oluşturmak için kullanılır."
+
+2. register.tsx
+Validation mesajlarını ayır:
+- name boşsa: "Ad Soyad zorunlu"
+- phone 10 hane değilse: "Telefon numarası 10 haneli olmalı"
+- password boşsa: "Şifre zorunlu"
+- password 6 rakam değilse: "Şifre 6 haneli rakamlardan oluşmalı"
+
+3. STATUS_LABELS.pending tutarsızlığını düzelt.
+"Beklemede" ve "Bekliyor" arasında tek değer kullan.
+Tercih: "Bekliyor"
+
+4. Berber slot ekranında "Kapalı" ve "Geçti" gri olarak birbirine çok benziyor.
+"Kapalı" badge/stilini daha ayırt edilir yap.
+Öneri:
+- Kapalı badge amber/sarı tonunda olabilir
+- Text: "Kapalı" veya "Kapatıldı"
+- Geçti gri kalabilir
+Ama büyük tema değişimi yapma.
+
+5. Slot ekranında kullanıcıya görünen metinlerde mümkün olan yerlerde "slot" yerine "saat aralığı" kullan.
+Örnek:
+- "Yeni Slot Ekle" → "Yeni Saat Aralığı Ekle"
+- "Bu slotu silmek..." → "Bu saat aralığını silmek..."
+- "Slot oluşturulamadı" → "Saat aralığı eklenemedi"
+
+6. "Haftalık şablon güncellendi" metnini değiştir:
+"Haftalık program güncellendi"
+
+7. Demo sonrası listesinden C maddesini de yap:
+Müşteri booking ekranında "Dolu" slot kırmızı hata gibi görünmesin.
+Kırmızı yerine daha nötr/gri bir stil kullan.
+Ama "Müsait" yeşil, "Seçili" navy kalabilir.
+Amaç: Dolu bilgi versin, alarm/hata gibi görünmesin.
+
+8. Demo sonrası listesinden F maddesini de yap:
+"Slot süresi" geçen kullanıcı-facing metinleri "Randevu süresi" yap.
+Özellikle berber profil / haftalık program ekranında.
+Kod değişken adlarını değiştirme; sadece görünen metni değiştir.
+
+Dikkat:
+- API payload veya logic değiştirme.
+- Kod değişken adlarını büyük refactor etme.
+- Sadece UI text/style/validation düzelt.
+- Typecheck çalıştır.
+- Patch sonrası kısa rapor ver:
+  - Değişen dosyalar
+  - Değişen metinler
+  - Kapalı/Geçti ayrımı nasıl düzeldi
+  - Booking ekranında Dolu rengi nasıl değişti
+  - Register validation nasıl ayrıldı
+  - "Slot süresi" → "Randevu süresi" nerelerde yapıldı
+  - Typecheck sonucu

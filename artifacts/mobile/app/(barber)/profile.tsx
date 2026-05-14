@@ -80,7 +80,7 @@ function validateSchedule(rows: DayRow[]): string | null {
     if (timeToMinutes(row.startTime) >= timeToMinutes(row.endTime))
       return `${DAY_NAMES[row.dayOfWeek]}: Başlangıç saati bitiş saatinden önce olmalı`;
     if (!valid.includes(row.slotDuration))
-      return `${DAY_NAMES[row.dayOfWeek]}: Slot süresi 30, 45, 60 veya 90 dk olmalı`;
+      return `${DAY_NAMES[row.dayOfWeek]}: Randevu süresi 30, 45, 60 veya 90 dk olmalı`;
   }
   return null;
 }
@@ -315,7 +315,7 @@ export default function BarberProfile() {
         </View>
 
         <Text style={styles.scheduleHint}>
-          Seed-week bu programa göre yeni günler oluşturur.
+          Bu program haftalık otomatik takvim oluşturmak için kullanılır.
         </Text>
 
         {schedule.map((row) => (
@@ -483,7 +483,7 @@ function DayScheduleRow({
                 </View>
               </View>
               <View style={styles.durationRow}>
-                <Text style={styles.timeFieldLabel}>Slot süresi</Text>
+                <Text style={styles.timeFieldLabel}>Randevu süresi</Text>
                 <View style={styles.durationOptions}>
                   {DURATION_OPTIONS.map((d) => (
                     <TouchableOpacity
