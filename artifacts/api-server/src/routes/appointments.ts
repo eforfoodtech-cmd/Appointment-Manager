@@ -48,8 +48,10 @@ function istanbulToMs(date: string, hhmm: string): number {
   return new Date(`${date}T${hhmm}:00+03:00`).getTime();
 }
 
-// Lazy auto-complete: any pending/confirmed appointment whose slot end_time has passed
-// (Istanbul time) is auto-marked completed. Idempotent; safe to call frequently.
+// Lazy auto-complete: any pending/confirmed appointment whose slot date is before
+// today (Istanbul time) is auto-marked completed. Today's appointments are left
+// active until end of day so the barber can still mark them as no_show after they
+// finish. Idempotent; safe to call frequently.
 export async function autoCompletePastAppointments(
   txOrDb: { execute: (q: ReturnType<typeof sql>) => Promise<unknown> } = db,
 ): Promise<void> {
