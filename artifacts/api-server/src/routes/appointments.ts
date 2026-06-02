@@ -53,17 +53,16 @@ function istanbulToMs(date: string, hhmm: string): number {
 export async function autoCompletePastAppointments(
   txOrDb: { execute: (q: ReturnType<typeof sql>) => Promise<unknown> } = db,
 ): Promise<void> {
-  const { date: nowDate, minutesOfDay: nowMin } = getNowInIstanbul();
-  const hh = String(Math.floor(nowMin / 60)).padStart(2, "0");
-  const mm = String(nowMin % 60).padStart(2, "0");
-  const nowHHMM = `${hh}:${mm}`;
+  const { date: nowDate } = getNowInIstanbul();
+  // Only auto-complete appointments on past days. Today's pending/confirmed
+  // appointments stay active until end of day so the barber can still mark
+  // them as no_show after they finish.
   await txOrDb.execute(sql`
     UPDATE appointments SET status='completed', updated_at=NOW()
     WHERE status IN ('pending','confirmed')
       AND slot_id IN (
         SELECT id FROM appointment_slots
         WHERE date < ${nowDate}
-           OR (date = ${nowDate} AND end_time <= ${nowHHMM})
       )
   `);
 }
@@ -472,10 +471,16 @@ router.patch("/:id", authenticate, async (req: AuthRequest, res) => {
 
       const slotStartMs = istanbulToMs(s.date, s.startTime);
       const nowMs = Date.now();
+      const { date: nowDate } = getNowInIstanbul();
 
       if (status === "no_show") {
         if (nowMs < slotStartMs) {
           return { status: 400 as const, error: "Randevu saati henüz gelmedi" };
+        }
+        // Past days can no longer be marked no_show; they are auto-completed.
+        // Same-day appointments stay markable until end of day (23:59).
+        if (s.date < nowDate) {
+          return { status: 400 as const, error: "Bu randevu artık kapatılmış" };
         }
         // Manual appointments have no app customer → just mark status, no block
         if (existing.customerId != null) {

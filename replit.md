@@ -103,10 +103,10 @@ pnpm run typecheck
 
 ## Demo Accounts (seeded)
 
-| Role | Email | Password |
+| Role | Telefon | Şifre |
 |---|---|---|
-| Berber | berber@test.com | test123 |
-| Müşteri | musteri@test.com | test123 |
+| Berber | 05550000001 | 123456 |
+| Müşteri | 05550000002 | 123456 |
 
 ## Environment Variables
 
