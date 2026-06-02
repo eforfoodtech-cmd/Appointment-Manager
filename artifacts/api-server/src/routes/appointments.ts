@@ -14,6 +14,10 @@ import {
 } from "@workspace/db";
 import { eq, and, sql, inArray } from "drizzle-orm";
 import { authenticate, type AuthRequest } from "../middlewares/auth";
+import {
+  scheduleAppointmentReminders,
+  cancelAppointmentReminders,
+} from "../lib/notifications";
 
 const router = Router();
 
@@ -372,6 +376,21 @@ router.post("/", authenticate, async (req: AuthRequest, res) => {
   }
 
   const enriched = await getAppointmentById(result.appointmentId);
+
+  // Faz 1B: schedule 1-day + 1-hour reminders for app customers.
+  // Failure here must never break booking.
+  try {
+    await scheduleAppointmentReminders({
+      appointmentId: result.appointmentId,
+      customerId: enriched?.customerId ?? null,
+      date: enriched?.date ?? "",
+      startTime: enriched?.startTime ?? "",
+      shopName: enriched?.shopName ?? "",
+    });
+  } catch (err) {
+    req.log.error({ err }, "Randevu hatırlatmaları planlanamadı");
+  }
+
   res.status(201).json(enriched);
 });
 
@@ -591,6 +610,10 @@ router.patch("/:id", authenticate, async (req: AuthRequest, res) => {
       if (!freedOld) {
         return { status: 400 as const, error: "İptal işlemi tamamlanamadı" };
       }
+
+      // Faz 1B: cancel pending reminders atomically within the same tx so we
+      // never leave reminders that could still fire after cancellation.
+      await cancelAppointmentReminders(id, tx);
     }
 
     await tx
@@ -607,6 +630,7 @@ router.patch("/:id", authenticate, async (req: AuthRequest, res) => {
   }
 
   const enriched = await getAppointmentById(id);
+
   res.json(enriched);
 });
 

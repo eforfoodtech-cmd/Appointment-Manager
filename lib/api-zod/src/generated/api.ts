@@ -497,6 +497,15 @@ export const SendMessageBody = zod.object({
 });
 
 /**
+ * @summary Register or update an Expo push token for the current user
+ */
+
+export const RegisterPushTokenBody = zod.object({
+  token: zod.string().min(1),
+  platform: zod.string().optional(),
+});
+
+/**
  * @summary Get barber dashboard summary
  */
 export const GetBarberDashboardQueryParams = zod.object({

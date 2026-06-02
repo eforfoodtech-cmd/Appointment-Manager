@@ -226,6 +226,23 @@ export interface SendMessageRequest {
   content: string;
 }
 
+export interface PushToken {
+  id: number;
+  userId: number;
+  token: string;
+  /** @nullable */
+  platform?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  lastSeenAt: string;
+}
+
+export interface PushTokenInput {
+  /** @minLength 1 */
+  token: string;
+  platform?: string;
+}
+
 export interface BarberDashboard {
   todayCount: number;
   pendingCount: number;

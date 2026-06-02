@@ -112,3 +112,43 @@ pnpm run typecheck
 
 - `SESSION_SECRET` — JWT signing secret (already set)
 - `DATABASE_URL` — PostgreSQL connection string (auto-provisioned)
+
+## Bildirim Sistemi (Faz 1B)
+
+Minimal gerçek push bildirim sistemi. **Kapsam: yalnızca müşteri randevu hatırlatmaları** — randevudan 1 gün ve 1 saat önce. Daha fazlası (berber bildirimleri, mesaj bildirimleri, vb.) bu fazın dışındadır.
+
+### Nasıl çalışır
+
+1. **Token kaydı** — Mobil uygulama açıldığında, giriş yapmış **müşteri** için Expo push token alınır ve `POST /api/push-tokens` ile sunucuya kaydedilir (`push_tokens` tablosu, upsert). Web, izin reddi, simülatör veya EAS projectId yoksa sessizce atlanır; uygulama asla çökmez.
+2. **Hatırlatma planlama** — Müşteri randevu aldığında (`POST /api/appointments`), 1 gün ve 1 saat öncesi için `scheduled_notifications` tablosuna `pending` kayıtlar eklenir. Geçmişte kalan hatırlatma zamanları atlanır. Manuel randevularda (müşteri hesabı yok) hatırlatma oluşturulmaz.
+3. **İptal** — Randevu iptal edilince (`PATCH /api/appointments/:id` → `cancelled`) bekleyen hatırlatmalar `cancelled` yapılır.
+4. **Gönderim** — `src/scheduler.ts` tek seferlik çalışır: zamanı gelmiş (`pending`, `scheduled_for <= now`) hatırlatmaları bulur, Expo Push API'ye gönderir, sonucu `sent`/`failed` olarak işaretler ve çıkar. Token yoksa veya Expo reddederse `failed` olur (uygulama/scheduler çökmez).
+
+### Veritabanı tabloları
+
+- `push_tokens` — kullanıcı başına Expo push token (token unique, upsert ile güncellenir).
+- `scheduled_notifications` — planlanmış hatırlatmalar. Enumlar: `notification_type` (`reminder_1d` | `reminder_1h`), `notification_status` (`pending` | `processing` | `sent` | `failed` | `cancelled`).
+
+### Scheduler kurulumu (Replit Scheduled Deployment)
+
+Hatırlatmaların gönderilmesi için zamanlanmış bir deployment gerekir:
+
+```bash
+# Tek seferlik çalıştırma komutu (5 dakikada bir önerilir):
+pnpm --filter @workspace/api-server run scheduler
+```
+
+- Replit'te **Scheduled Deployment** oluştur, komut olarak yukarıdakini ver, periyot ~5 dakika.
+- Kurulum 5–15 dakika sürer. Scheduler her çalıştığında zamanı gelmiş hatırlatmaları gönderip çıkar (tek seferlik, sürekli çalışmaz).
+- **Çift gönderim koruması:** Hatırlatmalar tek atomik `UPDATE pending → processing` ile "claim" edilir; üst üste binen çalıştırmalar aynı kaydı iki kez gönderemez. Her kayıt `status='processing'` koşuluyla `sent`/`failed`/`cancelled` olarak kapatılır. Bir çalıştırma claim ile kapatma arasında çökerse, kayıt `processing`'te kalır; sonraki çalıştırma 15 dakikalık lease süresini aşmış `processing` kayıtları `pending`'e geri alıp yeniden dener (hiçbir kayıt kalıcı olarak takılı kalmaz).
+
+### Test sınırlaması
+
+**Push bildirimleri Expo Go'da test edilemez.** Gerçek push token almak için EAS development build veya standalone build gerekir. `app.json` içinde EAS `projectId` tanımlı değildir; tanımlanana kadar token alımı sessizce başarısız olur (beklenen davranış). Sunucu tarafı (planlama, iptal, scheduler) Expo Go'dan bağımsız olarak çalışır ve test edilebilir.
+
+### İlgili komutlar
+
+```bash
+# Scheduler'ı bir kez elle çalıştır (lokal test)
+pnpm --filter @workspace/api-server run scheduler
+```

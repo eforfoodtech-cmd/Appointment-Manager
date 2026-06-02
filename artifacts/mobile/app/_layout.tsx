@@ -17,6 +17,7 @@ import { setBaseUrl, useSeedWeekSlots } from "@workspace/api-client-react";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
+import { usePushRegistration } from "@/hooks/usePushRegistration";
 
 setBaseUrl(`https://${process.env.EXPO_PUBLIC_DOMAIN}`);
 
@@ -59,6 +60,11 @@ function BarberSeeder() {
     }
   }, [user, token, seedWeek]);
 
+  return null;
+}
+
+function PushRegistrar() {
+  usePushRegistration();
   return null;
 }
 
@@ -111,6 +117,7 @@ function RootLayoutNav() {
     <>
       <AuthGuard />
       <BarberSeeder />
+      <PushRegistrar />
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="index" />
         <Stack.Screen name="(auth)" />

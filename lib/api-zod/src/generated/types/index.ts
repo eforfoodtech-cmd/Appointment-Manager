@@ -25,6 +25,8 @@ export * from "./listAppointmentsParams";
 export * from "./loginRequest";
 export * from "./message";
 export * from "./noShowBlock";
+export * from "./pushToken";
+export * from "./pushTokenInput";
 export * from "./registerRequest";
 export * from "./registerRequestRole";
 export * from "./seedWeekSlots200";

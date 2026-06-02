@@ -22,6 +22,8 @@ tags:
     description: Customer management
   - name: messages
     description: Messaging
+  - name: notifications
+    description: Push notifications
 
 paths:
   /healthz:
@@ -565,6 +567,40 @@ paths:
                 items:
                   $ref: "#/components/schemas/Message"
 
+  # Push notifications
+  /push-tokens:
+    post:
+      operationId: registerPushToken
+      tags: [notifications]
+      summary: Register or update an Expo push token for the current user
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PushTokenInput"
+      responses:
+        "201":
+          description: Push token registered
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PushToken"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   # Dashboard summary (wow endpoint)
   /barbers/me/dashboard:
     get:
@@ -1057,6 +1093,45 @@ components:
       required:
         - receiverIds
         - content
+
+    PushToken:
+      type: object
+      properties:
+        id:
+          type: integer
+        userId:
+          type: integer
+        token:
+          type: string
+        platform:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        lastSeenAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - userId
+        - token
+        - createdAt
+        - updatedAt
+        - lastSeenAt
+
+    PushTokenInput:
+      type: object
+      properties:
+        token:
+          type: string
+          minLength: 1
+        platform:
+          type: string
+      required:
+        - token
 
     BarberDashboard:
       type: object
