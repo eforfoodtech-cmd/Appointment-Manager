@@ -1,0 +1,62 @@
+Yeni özellik planı: Bildirim sistemi.
+
+Önce kod değiştirme. Sadece mevcut yapıyı incele ve raporla.
+
+Ürün kararımız:
+Berberi gün içinde bildirim yağmuruna tutmak istemiyoruz. Anlık her randevu bildirimi şimdilik yok.
+
+İstenen bildirimler:
+
+Müşteri bildirimleri:
+1. Randevudan 1 gün önce hatırlatma
+   Örnek: "Yarın 14:00’te randevunuz var."
+2. Randevudan 1 saat önce hatırlatma
+   Örnek: "Randevunuz 1 saat sonra."
+3. Son tamamlanan randevudan 15 gün sonra tekrar randevuya çağırma
+   Örnek: "Son tıraşınızın üzerinden 15 gün geçti. Yeni randevu almak ister misiniz?"
+
+Berber bildirimleri:
+4. Her sabah günlük özet
+   Örnek: "Bugün 7 randevunuz var, 5 boş saat aralığınız kaldı."
+
+Şu an istemediklerimiz:
+- Her yeni randevuda berbere bildirim gönderme
+- Her iptalde bildirim bombardımanı
+- Gün içinde çok sık bildirim
+- Manuel randevuda müşteriye bildirim
+
+İncelenecekler:
+1. Mobile Expo projesinde expo-notifications kurulu mu?
+2. App içinde notification permission/token alma kodu var mı?
+3. Backend’de push token saklayan alan/tablo var mı?
+4. Scheduled notification/job altyapısı var mı?
+5. Replit ortamında scheduled job / cron / interval için mevcut yapı var mı?
+6. appointments tablosunda randevu tarihi/saat bilgileri bildirim planlamak için yeterli mi?
+7. completed randevudan 15 gün sonra bildirim için status transition nerede yakalanabilir?
+8. Günlük berber özeti için kaç randevu / kaç boş slot hesaplanabilir mi?
+9. Expo push notification göndermek için backend helper gerekir mi?
+10. En minimal ve güvenli MVP planı ne olmalı?
+
+Önerilen teknik planı değerlendir:
+- push_tokens tablosu
+- scheduled_notifications tablosu
+- push token register endpoint
+- backend notification helper
+- scheduled notification worker/job
+- randevu oluşunca 1 gün önce ve 1 saat önce bildirim kayıtları oluşturma
+- randevu iptal edilirse ilgili pending bildirimleri cancel etme
+- appointment completed olunca 15 gün sonrası reactivation bildirimi oluşturma
+- her sabah berber summary bildirimi için job
+
+Rapor formatı:
+- Mevcut durum
+- DB migration gerekiyor mu?
+- Backend değişiklikleri
+- Mobile değişiklikleri
+- Scheduler/job seçenekleri
+- Replit için en uygun yol
+- Riskler
+- Hemen yapılmalı / sonra yapılmalı ayrımı
+- Tahmini dosya listesi
+
+Kod değiştirme. Önce sadece rapor ver.
