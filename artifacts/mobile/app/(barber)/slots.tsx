@@ -32,6 +32,7 @@ import {
   useSetMyAvailability,
   getGetMyAvailabilityQueryKey,
   useCreateAppointment,
+  useUpdateAppointment,
 } from "@workspace/api-client-react";
 import type { SlotAppointmentDetail } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -91,13 +92,18 @@ interface CustomerDetailModalProps {
   visible: boolean;
   slotTime: string;
   appointment: SlotAppointmentDetail | null;
+  isPast: boolean;
+  cancelling: boolean;
+  onCancel: () => void;
   onClose: () => void;
 }
 
-function CustomerDetailModal({ visible, slotTime, appointment, onClose }: CustomerDetailModalProps) {
+function CustomerDetailModal({ visible, slotTime, appointment, isPast, cancelling, onCancel, onClose }: CustomerDetailModalProps) {
   if (!appointment) return null;
   const statusColor = STATUS_COLORS[appointment.status] ?? c.mutedForeground;
   const statusLabel = STATUS_LABELS[appointment.status] ?? appointment.status;
+  const isActive = appointment.status === "pending" || appointment.status === "confirmed";
+  const canCancelManual = appointment.isManual && isActive && !isPast;
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
@@ -167,9 +173,36 @@ function CustomerDetailModal({ visible, slotTime, appointment, onClose }: Custom
             </View>
           </View>
 
-          <TouchableOpacity style={styles.closeBtn} onPress={onClose} activeOpacity={0.8}>
-            <Text style={styles.closeBtnText}>Kapat</Text>
-          </TouchableOpacity>
+          {appointment.isManual && (
+            <View style={styles.manualInfoRow}>
+              <Feather name="edit-3" size={14} color="#7C3AED" />
+              <Text style={styles.manualInfoText}>Manuel randevu</Text>
+            </View>
+          )}
+
+          {canCancelManual ? (
+            <View style={styles.detailActions}>
+              <TouchableOpacity style={[styles.closeBtn, { flex: 1 }]} onPress={onClose} activeOpacity={0.8}>
+                <Text style={styles.closeBtnText}>Kapat</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.detailCancelBtn, { flex: 1 }, cancelling && { opacity: 0.7 }]}
+                onPress={onCancel}
+                activeOpacity={0.8}
+                disabled={cancelling}
+              >
+                {cancelling ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <Text style={styles.detailCancelText}>Randevuyu İptal Et</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <TouchableOpacity style={styles.closeBtn} onPress={onClose} activeOpacity={0.8}>
+              <Text style={styles.closeBtnText}>Kapat</Text>
+            </TouchableOpacity>
+          )}
         </TouchableOpacity>
       </TouchableOpacity>
     </Modal>
@@ -188,6 +221,7 @@ export default function SlotsScreen() {
   const [detailSlot, setDetailSlot] = useState<{
     time: string;
     appointment: SlotAppointmentDetail;
+    isPast: boolean;
   } | null>(null);
 
   const [manualSlot, setManualSlot] = useState<{
@@ -292,6 +326,19 @@ export default function SlotsScreen() {
         Alert.alert("Hata", err?.data?.error ?? "Randevu oluşturulamadı"),
     },
   });
+
+  const cancelManualAppt = useUpdateAppointment({
+    mutation: {
+      onSuccess: () => {
+        invalidateSlots();
+        setDetailSlot(null);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        showToast("Manuel randevu iptal edildi", "success");
+      },
+      onError: (err: any) =>
+        Alert.alert("Hata", err?.data?.error ?? "Randevu iptal edilemedi"),
+    },
+  });
   const setAvailability = useSetMyAvailability({
     mutation: {
       onSuccess: () => {
@@ -365,6 +412,7 @@ export default function SlotsScreen() {
       setDetailSlot({
         time: `${slot.startTime} – ${slot.endTime}`,
         appointment: slot.appointment,
+        isPast: isPastSlot(slot.startTime),
       });
       return;
     }
@@ -567,7 +615,7 @@ export default function SlotsScreen() {
       {/* Add slot modal */}
       <Modal visible={showAddModal} transparent animationType="slide">
         <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : undefined}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
           style={styles.modalOverlay}
           keyboardVerticalOffset={0}
         >
@@ -639,6 +687,28 @@ export default function SlotsScreen() {
         visible={detailSlot !== null}
         slotTime={detailSlot?.time ?? ""}
         appointment={detailSlot?.appointment ?? null}
+        isPast={detailSlot?.isPast ?? false}
+        cancelling={cancelManualAppt.isPending}
+        onCancel={() => {
+          const appt = detailSlot?.appointment;
+          if (!appt) return;
+          Alert.alert(
+            "Manuel Randevuyu İptal Et",
+            "Bu manuel randevuyu iptal etmek istediğine emin misin?",
+            [
+              { text: "Vazgeç", style: "cancel" },
+              {
+                text: "İptal Et",
+                style: "destructive",
+                onPress: () =>
+                  cancelManualAppt.mutate({
+                    appointmentId: appt.id,
+                    data: { status: "cancelled" },
+                  }),
+              },
+            ],
+          );
+        }}
         onClose={() => setDetailSlot(null)}
       />
 
@@ -1050,6 +1120,38 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   closeBtnText: {
+    fontSize: 15,
+    fontFamily: "Inter_600SemiBold",
+    color: "#fff",
+  },
+  manualInfoRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "#7C3AED15",
+    borderRadius: colors.radius,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    marginBottom: 12,
+  },
+  manualInfoText: {
+    fontSize: 13,
+    fontFamily: "Inter_600SemiBold",
+    color: "#7C3AED",
+  },
+  detailActions: {
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 4,
+  },
+  detailCancelBtn: {
+    backgroundColor: "#EF4444",
+    borderRadius: colors.radius,
+    paddingVertical: 14,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  detailCancelText: {
     fontSize: 15,
     fontFamily: "Inter_600SemiBold",
     color: "#fff",
