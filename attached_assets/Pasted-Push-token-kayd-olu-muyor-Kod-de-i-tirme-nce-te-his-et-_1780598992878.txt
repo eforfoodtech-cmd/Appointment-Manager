@@ -1,0 +1,63 @@
+Push token kaydı oluşmuyor. Kod değiştirme, önce teşhis et ve raporla.
+
+Durum:
+- Android development build telefonda açıldı.
+- Müşteri hesabıyla randevu oluşturuldu.
+- scheduled_notifications kayıtları oluştu.
+- push_tokens tablosu boş.
+- Android ayarlarında uygulama bildirimleri açık.
+- Bildirim izni popup’ı kullanıcıya çıkmamış.
+- app.json içinde extra.eas.projectId mevcut:
+  e9bd9567-a9dd-436d-b57f-dd9b22b455a6
+- app.json owner: onur123123123
+
+Kontrol edilecekler:
+
+1. artifacts/mobile/hooks/usePushRegistration.ts dosyasını incele.
+   - Hook gerçekten mount oluyor mu?
+   - user/token geldiğinde tetikleniyor mu?
+   - Sadece customer için mi çalışıyor?
+   - Permission isteme satırı var mı?
+   - getExpoPushTokenAsync çağrısı projectId ile mi çalışıyor?
+   - Hata olursa sessizce mi geçiyor?
+
+2. artifacts/mobile/app/_layout.tsx içinde PushRegistrar gerçekten render ediliyor mu?
+   - AuthProvider içinde mi?
+   - useAuth() doğru context’ten user/token alabiliyor mu?
+
+3. Backend endpoint canlı mı?
+   - POST /api/push-tokens yetkisiz 401 veriyor mu?
+   - Geçersiz body 400 veriyor mu?
+   - Geçerli fake Expo push token + customer auth token ile DB’ye yazıyor mu?
+   - Fake token testinden sonra kaydı temizle.
+
+4. Mobile loglarında push registration hatası var mı?
+   Şu tür hataları ara:
+   - projectId missing
+   - Must use physical device
+   - Device.isDevice false
+   - permission denied
+   - getExpoPushTokenAsync failed
+   - network error
+   - endpoint 401/400/500
+
+5. Eğer loglarda görünmüyorsa minimal debug patch öner:
+   Geçici olarak usePushRegistration içine şu bilgileri görünür logla:
+   - hook started
+   - role
+   - platform
+   - projectId var mı
+   - existing permission status
+   - final permission status
+   - Device.isDevice
+   - token alındı mı
+   - backend register çağrısı sonucu
+
+Rapor formatı:
+- Kesin doğrulananlar
+- Muhtemel kök sebep
+- Endpoint fake token testi sonucu
+- Yeniden build gerekir mi?
+- Minimal debug patch gerekiyor mu?
+
+Kod değiştirme, sadece rapor ver.

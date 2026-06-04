@@ -16,7 +16,9 @@
     "ios": {
       "supportsTablet": false
     },
-    "android": {},
+    "android": {
+      "package": "com.onur123123123.tiras"
+    },
     "web": {
       "favicon": "./assets/images/icon.png"
     },
@@ -39,6 +41,12 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "e9bd9567-a9dd-436d-b57f-dd9b22b455a6"
+      }
+    },
+    "owner": "onur123123123"
   }
 }
