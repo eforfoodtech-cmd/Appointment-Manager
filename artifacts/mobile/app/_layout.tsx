@@ -19,7 +19,26 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { usePushRegistration } from "@/hooks/usePushRegistration";
 
-setBaseUrl(`https://${process.env.EXPO_PUBLIC_DOMAIN}`);
+function resolveApiBaseUrl() {
+  const envDomain = process.env.EXPO_PUBLIC_DOMAIN;
+  if (envDomain) {
+    return `https://${envDomain}`;
+  }
+
+  if (Platform.OS === "web" && typeof window !== "undefined") {
+    const { protocol, hostname, port, origin } = window.location;
+
+    if (port === "8081") {
+      return `${protocol}//${hostname}:8080`;
+    }
+
+    return origin;
+  }
+
+  return null;
+}
+
+setBaseUrl(resolveApiBaseUrl());
 
 SplashScreen.preventAutoHideAsync();
 

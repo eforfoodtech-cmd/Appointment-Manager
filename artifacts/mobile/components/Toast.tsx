@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback } from "react";
-import { Animated, StyleSheet, Text, View } from "react-native";
+import { Animated, Platform, StyleSheet, Text, View } from "react-native";
 import { Feather } from "@expo/vector-icons";
 
 type ToastType = "success" | "error" | "info";
@@ -40,8 +40,11 @@ export function useToast() {
 
   const ToastComponent = visible ? (
     <Animated.View
-      style={[styles.toast, { backgroundColor: BG[type], opacity }]}
-      pointerEvents="none"
+      style={[
+        styles.toast,
+        Platform.OS === "web" ? { pointerEvents: "none" } : null,
+        { backgroundColor: BG[type], opacity },
+      ]}
     >
       <Feather name={ICON[type]} size={16} color="#fff" />
       <Text style={styles.text}>{message}</Text>
