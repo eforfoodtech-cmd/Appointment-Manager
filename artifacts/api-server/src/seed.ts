@@ -20,7 +20,7 @@ const DEMO_USERS: DemoUser[] = [
     firstName: "Demo",
     lastName: "Berber",
     role: "barber",
-    phone: "05550000001",
+    phone: "5550000001",
     shopName: "Demo Berber Salonu",
     shopAddress: "Atatürk Mahallesi, Demo Caddesi No: 1, İstanbul",
   },
@@ -30,12 +30,13 @@ const DEMO_USERS: DemoUser[] = [
     firstName: "Demo",
     lastName: "Müşteri",
     role: "customer",
-    phone: "05550000002",
+    phone: "5550000002",
   },
 ];
 
 export async function seedDemoUsers(): Promise<void> {
   for (const demoUser of DEMO_USERS) {
+    const legacyPhone = `0${demoUser.phone}`;
     const [existingUser] = await db
       .select()
       .from(usersTable)
@@ -43,8 +44,10 @@ export async function seedDemoUsers(): Promise<void> {
         or(
           eq(usersTable.email, demoUser.email),
           eq(usersTable.phone, demoUser.phone),
+          eq(usersTable.phone, legacyPhone),
           // Previous demo versions stored the phone number in the email field.
           eq(usersTable.email, demoUser.phone),
+          eq(usersTable.email, legacyPhone),
         ),
       )
       .limit(1);
@@ -53,7 +56,7 @@ export async function seedDemoUsers(): Promise<void> {
       await db
         .update(usersTable)
         .set({
-          ...(existingUser.email === demoUser.phone
+          ...([demoUser.phone, legacyPhone].includes(existingUser.email)
             ? { email: demoUser.email }
             : {}),
           name: `${demoUser.firstName} ${demoUser.lastName}`,

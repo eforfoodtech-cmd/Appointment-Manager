@@ -1,4 +1,6 @@
+import { sql } from "drizzle-orm";
 import {
+  check,
   integer,
   pgEnum,
   pgTable,
@@ -30,6 +32,10 @@ export const usersTable = pgTable(
     createdAt: timestamp("created_at").notNull().defaultNow(),
   },
   (table) => ({
+    phoneFormatCheck: check(
+      "users_phone_format_check",
+      sql`${table.phone} is null or ${table.phone} ~ '^5[0-9]{9}$'`,
+    ),
     phoneUnique: uniqueIndex("users_phone_unique").on(table.phone),
   }),
 );
