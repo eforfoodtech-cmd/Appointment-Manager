@@ -17,6 +17,7 @@ import { useLogin } from "@workspace/api-client-react";
 import { useAuth } from "@/context/AuthContext";
 import { AuthBackgroundTexture } from "@/components/AuthBackgroundTexture";
 import colors from "@/constants/colors";
+import { isTurkishMobilePhone } from "@/utils/phone";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -27,12 +28,7 @@ function normalizeIdentifier(value: string) {
     return EMAIL_RE.test(trimmed) ? trimmed.toLowerCase() : "";
   }
 
-  const compactPhone = trimmed.replace(/[\s()-]/g, "");
-  if (/^5\d{9}$/.test(compactPhone)) return `0${compactPhone}`;
-  if (/^05\d{9}$/.test(compactPhone)) return compactPhone;
-  if (/^(?:\+90|0090|90)5\d{9}$/.test(compactPhone)) {
-    return `0${compactPhone.slice(-10)}`;
-  }
+  if (isTurkishMobilePhone(trimmed)) return trimmed;
 
   return "";
 }
@@ -108,7 +104,7 @@ export default function LoginScreen() {
               style={styles.input}
               value={identifier}
               onChangeText={setIdentifier}
-              placeholder="ornek@mail.com veya 05551112233"
+              placeholder="ornek@mail.com veya 5551112233"
               placeholderTextColor={colors.light.mutedForeground}
               keyboardType="email-address"
               autoCapitalize="none"

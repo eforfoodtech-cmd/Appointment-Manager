@@ -20,6 +20,10 @@ import {
 } from "@workspace/api-client-react";
 import { AuthBackgroundTexture } from "@/components/AuthBackgroundTexture";
 import colors from "@/constants/colors";
+import {
+  isTurkishMobilePhone,
+  sanitizeTurkishMobilePhone,
+} from "@/utils/phone";
 
 type Channel = "email" | "phone";
 type Step = "method" | "target" | "code" | "password" | "success";
@@ -33,13 +37,7 @@ function normalizeTarget(value: string, channel: Channel) {
     return EMAIL_RE.test(trimmed) ? trimmed.toLowerCase() : "";
   }
 
-  const compactPhone = trimmed.replace(/[\s()-]/g, "");
-  if (/^5\d{9}$/.test(compactPhone)) return `0${compactPhone}`;
-  if (/^05\d{9}$/.test(compactPhone)) return compactPhone;
-  if (/^(?:\+90|0090|90)5\d{9}$/.test(compactPhone)) {
-    return `0${compactPhone.slice(-10)}`;
-  }
-  return "";
+  return isTurkishMobilePhone(trimmed) ? trimmed : "";
 }
 
 function errorMessage(error: any, fallback: string) {
@@ -132,7 +130,7 @@ export default function ForgotPasswordScreen() {
         "Hata",
         channel === "email"
           ? "Geçerli bir e-posta adresi girin"
-          : "Geçerli bir telefon numarası girin",
+          : "Telefon numarası 5 ile başlayan 10 haneli olmalı",
       );
       return;
     }
@@ -303,11 +301,17 @@ export default function ForgotPasswordScreen() {
                 <TextInput
                   style={styles.input}
                   value={target}
-                  onChangeText={setTarget}
+                  onChangeText={(value) =>
+                    setTarget(
+                      channel === "phone"
+                        ? sanitizeTurkishMobilePhone(value)
+                        : value,
+                    )
+                  }
                   placeholder={
                     channel === "email"
                       ? "ornek@mail.com"
-                      : "05551112233 veya +905551112233"
+                      : "5551112233"
                   }
                   placeholderTextColor={c.mutedForeground}
                   keyboardType={
@@ -316,7 +320,7 @@ export default function ForgotPasswordScreen() {
                   autoCapitalize="none"
                   autoCorrect={false}
                   autoComplete={channel === "email" ? "email" : "tel"}
-                  maxLength={channel === "email" ? 254 : 30}
+                  maxLength={channel === "email" ? 254 : 10}
                 />
               </View>
               <PrimaryButton

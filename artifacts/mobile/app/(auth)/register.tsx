@@ -18,6 +18,10 @@ import { useRegister } from "@workspace/api-client-react";
 import { useAuth } from "@/context/AuthContext";
 import { AuthBackgroundTexture } from "@/components/AuthBackgroundTexture";
 import colors from "@/constants/colors";
+import {
+  isTurkishMobilePhone,
+  sanitizeTurkishMobilePhone,
+} from "@/utils/phone";
 
 type Role = "barber" | "customer";
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -74,7 +78,7 @@ export default function RegisterScreen() {
       Alert.alert("Hata", "Geçerli bir e-posta adresi girin");
       return;
     }
-    if (!/^5\d{9}$/.test(phone)) {
+    if (!isTurkishMobilePhone(phone)) {
       Alert.alert(
         "Hata",
         "Telefon numarası 5 ile başlayan 10 haneli bir numara olmalı",
@@ -89,7 +93,7 @@ export default function RegisterScreen() {
     const account = {
       email: email.trim().toLowerCase(),
       password,
-      phone: `0${phone}`,
+      phone,
     };
 
     if (role === "customer") {
@@ -250,13 +254,10 @@ export default function RegisterScreen() {
         <View style={styles.inputGroup}>
           <Text style={styles.label}>Telefon Numarası</Text>
           <View style={styles.phoneInput}>
-            <Text style={styles.phonePrefix}>0</Text>
             <TextInput
               style={styles.phoneField}
               value={phone}
-              onChangeText={(text) =>
-                setPhone(text.replace(/\D/g, "").slice(0, 10))
-              }
+              onChangeText={(text) => setPhone(sanitizeTurkishMobilePhone(text))}
               placeholder="5551112233"
               placeholderTextColor={c.mutedForeground}
               keyboardType="number-pad"
@@ -456,12 +457,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 16,
-  },
-  phonePrefix: {
-    fontSize: 15,
-    fontFamily: "Inter_400Regular",
-    color: c.foreground,
-    paddingRight: 4,
   },
   phoneField: {
     flex: 1,

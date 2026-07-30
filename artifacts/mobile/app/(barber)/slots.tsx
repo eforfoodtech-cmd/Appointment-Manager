@@ -39,6 +39,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { PressableScale } from "@/components/PressableScale";
 import { useToast } from "@/components/Toast";
 import colors from "@/constants/colors";
+import { toTurkishMobileTelUrl } from "@/utils/phone";
 import { formatTimeInput, normalizeTimeInput } from "@/utils/timeInput";
 
 const c = colors.light;
@@ -171,7 +172,9 @@ function CustomerDetailModal({
               <TouchableOpacity
                 style={styles.infoRow}
                 onPress={() =>
-                  Linking.openURL(`tel:${appointment.customerPhone}`)
+                  Linking.openURL(
+                    toTurkishMobileTelUrl(appointment.customerPhone!),
+                  )
                 }
                 activeOpacity={0.7}
               >

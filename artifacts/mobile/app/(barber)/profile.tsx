@@ -34,6 +34,10 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/components/Toast";
 import colors from "@/constants/colors";
+import {
+  isTurkishMobilePhone,
+  sanitizeTurkishMobilePhone,
+} from "@/utils/phone";
 import { formatTimeInput, normalizeTimeInput } from "@/utils/timeInput";
 
 const c = colors.light;
@@ -212,11 +216,18 @@ export default function BarberProfile() {
       Alert.alert("Hata", "İşletme adı zorunludur");
       return;
     }
+    if (phone && !isTurkishMobilePhone(phone)) {
+      Alert.alert(
+        "Hata",
+        "Telefon numarası 5 ile başlayan 10 haneli olmalı",
+      );
+      return;
+    }
     updateProfile.mutate({
       data: {
         shopName: shopName.trim(),
         shopAddress: shopAddress.trim() || undefined,
-        phone: phone.trim() || undefined,
+        phone: phone || undefined,
         bio: bio.trim() || undefined,
       },
     });
@@ -412,10 +423,11 @@ export default function BarberProfile() {
           <InfoRow
             label="Telefon"
             value={phone}
-            onChange={setPhone}
+            onChange={(value) => setPhone(sanitizeTurkishMobilePhone(value))}
             editable={editMode}
-            placeholder="0555 000 00 00"
+            placeholder="5550000000"
             keyboardType="phone-pad"
+            maxLength={10}
           />
           <InfoRow
             label="Biyografi"
@@ -694,6 +706,7 @@ function InfoRow({
   placeholder,
   multiline,
   keyboardType,
+  maxLength,
 }: {
   label: string;
   value: string;
@@ -702,6 +715,7 @@ function InfoRow({
   placeholder?: string;
   multiline?: boolean;
   keyboardType?: React.ComponentProps<typeof TextInput>["keyboardType"];
+  maxLength?: number;
 }) {
   return (
     <View style={{ marginBottom: 12, gap: 4 }}>
@@ -734,6 +748,7 @@ function InfoRow({
           placeholderTextColor={c.mutedForeground}
           multiline={multiline}
           keyboardType={keyboardType}
+          maxLength={maxLength}
         />
       ) : (
         <Text
