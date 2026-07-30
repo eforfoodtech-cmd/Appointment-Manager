@@ -24,6 +24,11 @@ import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { usePushRegistration } from "@/hooks/usePushRegistration";
 
 function resolveApiBaseUrl() {
+  const explicitApiUrl = process.env.EXPO_PUBLIC_API_URL?.trim();
+  if (explicitApiUrl) {
+    return explicitApiUrl;
+  }
+
   const envDomain = process.env.EXPO_PUBLIC_DOMAIN;
   if (envDomain) {
     return `https://${envDomain}`;
