@@ -16,7 +16,7 @@ function NativeTabLayout() {
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="barbers">
         <Icon sf={{ default: "scissors", selected: "scissors" }} />
-        <Label>Berberler</Label>
+        <Label>Berber Bul</Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="profile">
         <Icon sf={{ default: "person", selected: "person.fill" }} />
@@ -69,7 +69,7 @@ function ClassicTabLayout() {
       <Tabs.Screen
         name="barbers"
         options={{
-          title: "Berberler",
+          title: "Berber Bul",
           tabBarIcon: ({ color }) => <Feather name="scissors" size={22} color={color} />,
         }}
       />

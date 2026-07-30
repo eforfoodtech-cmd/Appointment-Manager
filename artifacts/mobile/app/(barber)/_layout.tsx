@@ -14,6 +14,10 @@ function NativeTabLayout() {
         <Icon sf={{ default: "house", selected: "house.fill" }} />
         <Label>Özet</Label>
       </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="customers">
+        <Icon sf={{ default: "person.2", selected: "person.2.fill" }} />
+        <Label>Müşteriler</Label>
+      </NativeTabs.Trigger>
       <NativeTabs.Trigger name="slots">
         <Icon sf={{ default: "calendar", selected: "calendar" }} />
         <Label>Slotlar</Label>
@@ -64,6 +68,13 @@ function ClassicTabLayout() {
         options={{
           title: "Özet",
           tabBarIcon: ({ color }) => <Feather name="home" size={22} color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="customers"
+        options={{
+          title: "Müşteriler",
+          tabBarIcon: ({ color }) => <Feather name="users" size={22} color={color} />,
         }}
       />
       <Tabs.Screen

@@ -32,6 +32,14 @@
       "expo-font",
       "expo-web-browser",
       [
+        "expo-camera",
+        {
+          "cameraPermission": "Berber QR kodunu tarayabilmek için kamerana erişmemiz gerekiyor.",
+          "microphonePermission": false,
+          "recordAudioAndroid": false
+        }
+      ],
+      [
         "expo-notifications",
         {
           "color": "#1C3461"

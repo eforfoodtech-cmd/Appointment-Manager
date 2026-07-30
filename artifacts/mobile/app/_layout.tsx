@@ -114,7 +114,10 @@ function AuthGuard() {
       return;
     }
 
-    if (user.role === "barber" && routeGroup === "(customer)") {
+    if (
+      user.role === "barber" &&
+      (routeGroup === "(customer)" || pathname === "/scan-barber-qr")
+    ) {
       if (pathname !== homePath) {
         router.replace(homePath);
       }
@@ -149,6 +152,10 @@ function RootLayoutNav() {
         <Stack.Screen
           name="appointment/[id]"
           options={{ headerShown: true, title: "Randevu Detayı", headerBackTitle: "Geri" }}
+        />
+        <Stack.Screen
+          name="scan-barber-qr"
+          options={{ headerShown: false, presentation: "fullScreenModal" }}
         />
       </Stack>
     </>
