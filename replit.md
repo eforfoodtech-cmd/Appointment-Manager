@@ -105,8 +105,8 @@ pnpm run typecheck
 
 | Role | Telefon | Şifre |
 |---|---|---|
-| Berber | 05550000001 | 123456 |
-| Müşteri | 05550000002 | 123456 |
+| Berber | 5550000001 | 123456 |
+| Müşteri | 5550000002 | 123456 |
 
 ## Environment Variables
 
