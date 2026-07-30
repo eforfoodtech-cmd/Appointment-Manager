@@ -21,6 +21,7 @@ import {
   requireBarber,
   type AuthRequest,
 } from "../middlewares/auth";
+import { parseCanonicalTurkishPhone } from "../lib/phone";
 import { autoCompletePastAppointments } from "./appointments";
 
 const router = Router();
@@ -160,20 +161,54 @@ router.get("/me", authenticate, requireBarber, async (req: AuthRequest, res) => 
 router.put("/me", authenticate, requireBarber, async (req: AuthRequest, res) => {
   const { shopName, shopAddress, bio, phone } = req.body;
 
-  await db
-    .update(barbersTable)
-    .set({
-      ...(shopName !== undefined && { shopName }),
-      ...(shopAddress !== undefined && { shopAddress }),
-      ...(bio !== undefined && { bio }),
-    })
-    .where(eq(barbersTable.userId, req.user!.id));
-
+  let canonicalPhone: string | undefined;
   if (phone !== undefined) {
-    await db
-      .update(usersTable)
-      .set({ phone })
-      .where(eq(usersTable.id, req.user!.id));
+    const parsedPhone = parseCanonicalTurkishPhone(phone);
+    if (!parsedPhone) {
+      res.status(400).json({ error: "Geçerli bir telefon numarası girin." });
+      return;
+    }
+    canonicalPhone = parsedPhone;
+  }
+
+  const hasBarberUpdates =
+    shopName !== undefined || shopAddress !== undefined || bio !== undefined;
+
+  try {
+    if (hasBarberUpdates || canonicalPhone !== undefined) {
+      await db.transaction(async (tx) => {
+        if (hasBarberUpdates) {
+          await tx
+            .update(barbersTable)
+            .set({
+              ...(shopName !== undefined && { shopName }),
+              ...(shopAddress !== undefined && { shopAddress }),
+              ...(bio !== undefined && { bio }),
+            })
+            .where(eq(barbersTable.userId, req.user!.id));
+        }
+
+        if (canonicalPhone !== undefined) {
+          await tx
+            .update(usersTable)
+            .set({ phone: canonicalPhone })
+            .where(eq(usersTable.id, req.user!.id));
+        }
+      });
+    }
+  } catch (error) {
+    if (
+      typeof error === "object" &&
+      error !== null &&
+      "code" in error &&
+      error.code === "23505"
+    ) {
+      res
+        .status(409)
+        .json({ error: "Bu telefon numarası zaten kullanılıyor." });
+      return;
+    }
+    throw error;
   }
 
   const [barber] = await db

@@ -30,11 +30,14 @@ import {
   type PasswordResetChannel,
 } from "../lib/passwordResetDelivery";
 import { logger } from "../lib/logger";
+import {
+  parseCanonicalTurkishPhone,
+  toTurkishPhoneE164,
+} from "../lib/phone";
 
 const router = Router();
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const PHONE_RE = /^05\d{9}$/;
 const OTP_RE = /^\d{6}$/;
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -109,35 +112,11 @@ function normalizeEmail(value: unknown) {
     : "";
 }
 
-/**
- * Canonical Turkish format is 05XXXXXXXXX. Common local and +90 forms are
- * accepted at the API boundary.
- */
-function normalizePhone(value: unknown) {
-  if (typeof value !== "string") return "";
-
-  const trimmed = value.trim();
-  if (!trimmed || trimmed.length > 30) return "";
-  if (!/^[+\d\s().-]+$/.test(trimmed)) return "";
-  if (trimmed.startsWith("+") && !trimmed.startsWith("+90")) return "";
-
-  let digits = trimmed.replace(/\D/g, "");
-  if (digits.startsWith("0090") && digits.length === 14) {
-    digits = `0${digits.slice(4)}`;
-  } else if (digits.startsWith("90") && digits.length === 12) {
-    digits = `0${digits.slice(2)}`;
-  } else if (digits.length === 10) {
-    digits = `0${digits}`;
-  }
-
-  return PHONE_RE.test(digits) ? digits : "";
-}
-
 function normalizeIdentifier(value: unknown): NormalizedIdentifier | null {
   const email = normalizeEmail(value);
   if (email) return { value: email, kind: "email" };
 
-  const phone = normalizePhone(value);
+  const phone = parseCanonicalTurkishPhone(value);
   if (phone) return { value: phone, kind: "phone" };
 
   return null;
@@ -327,7 +306,7 @@ function isUniqueViolation(error: unknown) {
 router.post("/register", async (req, res) => {
   const role = req.body?.role;
   const email = normalizeEmail(req.body?.email);
-  const phone = normalizePhone(req.body?.phone);
+  const phone = parseCanonicalTurkishPhone(req.body?.phone);
   const password = req.body?.password;
 
   if (role !== "barber" && role !== "customer") {
@@ -575,10 +554,13 @@ router.post("/password-reset/request", async (req, res) => {
     .where(lookupCondition(identifier))
     .limit(1);
 
+  const canonicalPhone = parseCanonicalTurkishPhone(user?.phone);
   const destination =
     channel === "email"
       ? normalizeEmail(user?.email)
-      : normalizePhone(user?.phone);
+      : canonicalPhone
+        ? toTurkishPhoneE164(canonicalPhone)
+        : "";
 
   if (!user || !destination) {
     // Do the same secret-dependent operation used by a real request, without
