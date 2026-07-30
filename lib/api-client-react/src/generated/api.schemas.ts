@@ -15,10 +15,10 @@ export interface ErrorResponse {
 }
 
 /**
- * Turkish mobile number. The server removes spaces, parentheses, and hyphens; accepts 5XXXXXXXXX, 05XXXXXXXXX, 905XXXXXXXXX, and +905XXXXXXXXX; and stores the canonical 05XXXXXXXXX form.
+ * Canonical Turkish mobile number: exactly 10 digits starting with 5. Do not include a leading zero, country code, spaces, parentheses, hyphens, or other formatting.
  * @minLength 10
- * @maxLength 30
- * @pattern ^(?:(?:\+|00)?90|0)?[\s().-]*5(?:[\s().-]*\d){9}$
+ * @maxLength 10
+ * @pattern ^5\d{9}$
  */
 export type TurkishPhoneNumber = string;
 
@@ -130,7 +130,7 @@ export type RegisterRequest = CustomerRegisterRequest | BarberRegisterRequest;
 
 export interface IdentifierLoginRequest {
   /**
-   * Email address or a supported Turkish phone-number form.
+   * Email address or a canonical Turkish mobile number: exactly 10 digits starting with 5, without a leading zero, country code, or formatting.
    * @minLength 1
    * @maxLength 254
    */
@@ -172,7 +172,7 @@ export const PasswordResetChannel = {
 
 export interface PasswordResetRequest {
   /**
-   * Email address or a supported Turkish phone-number form.
+   * Email address or a canonical Turkish mobile number: exactly 10 digits starting with 5, without a leading zero, country code, or formatting.
    * @minLength 1
    * @maxLength 254
    */
@@ -270,7 +270,7 @@ export interface Barber {
 export interface UpdateBarberRequest {
   shopName?: string;
   shopAddress?: string;
-  phone?: string;
+  phone?: TurkishPhoneNumber;
   bio?: string;
 }
 

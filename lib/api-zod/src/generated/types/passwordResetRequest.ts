@@ -9,7 +9,7 @@ import type { PasswordResetChannel } from "./passwordResetChannel";
 
 export interface PasswordResetRequest {
   /**
-   * Email address or a supported Turkish phone-number form.
+   * Email address or a canonical Turkish mobile number: exactly 10 digits starting with 5, without a leading zero, country code, or formatting.
    * @minLength 1
    * @maxLength 254
    */

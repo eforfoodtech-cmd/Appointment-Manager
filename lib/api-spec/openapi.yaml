@@ -900,8 +900,11 @@ components:
           type: string
           minLength: 1
           maxLength: 254
-          description: Email address or a supported Turkish phone-number form.
-          example: "+905551112233"
+          description: >-
+            Email address or a canonical Turkish mobile number: exactly 10
+            digits starting with 5, without a leading zero, country code, or
+            formatting.
+          example: "5551112233"
         password:
           type: string
           minLength: 6
@@ -944,8 +947,11 @@ components:
           type: string
           minLength: 1
           maxLength: 254
-          description: Email address or a supported Turkish phone-number form.
-          example: ayse@example.com
+          description: >-
+            Email address or a canonical Turkish mobile number: exactly 10
+            digits starting with 5, without a leading zero, country code, or
+            formatting.
+          example: "5551112233"
         channel:
           $ref: "#/components/schemas/PasswordResetChannel"
           description: >-
@@ -1029,14 +1035,14 @@ components:
 
     TurkishPhoneNumber:
       type: string
-      pattern: '^(?:(?:\+|00)?90|0)?[\s().-]*5(?:[\s().-]*\d){9}$'
+      pattern: '^5\d{9}$'
       minLength: 10
-      maxLength: 30
+      maxLength: 10
       description: >-
-        Turkish mobile number. The server removes spaces, parentheses, and
-        hyphens; accepts 5XXXXXXXXX, 05XXXXXXXXX, 905XXXXXXXXX, and
-        +905XXXXXXXXX; and stores the canonical 05XXXXXXXXX form.
-      example: "+905551112233"
+        Canonical Turkish mobile number: exactly 10 digits starting with 5.
+        Do not include a leading zero, country code, spaces, parentheses,
+        hyphens, or other formatting.
+      example: "5551112233"
 
     AuthResponse:
       type: object
@@ -1120,7 +1126,7 @@ components:
         shopAddress:
           type: string
         phone:
-          type: string
+          $ref: "#/components/schemas/TurkishPhoneNumber"
         bio:
           type: string
 

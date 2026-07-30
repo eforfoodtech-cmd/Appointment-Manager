@@ -5,10 +5,11 @@
  * Tıraş - Barber Appointment SaaS API
  * OpenAPI spec version: 0.1.0
  */
+import type { TurkishPhoneNumber } from "./turkishPhoneNumber";
 
 export interface UpdateBarberRequest {
   shopName?: string;
   shopAddress?: string;
-  phone?: string;
+  phone?: TurkishPhoneNumber;
   bio?: string;
 }

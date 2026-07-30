@@ -23,11 +23,9 @@ export const registerBodyOnePasswordMin = 6;
 export const registerBodyOnePasswordMax = 72;
 
 export const registerBodyOnePhoneMin = 10;
-export const registerBodyOnePhoneMax = 30;
+export const registerBodyOnePhoneMax = 10;
 
-export const registerBodyOnePhoneRegExp = new RegExp(
-  "^(?:(?:\\+|00)?90|0)?[\\s().-]\*5(?:[\\s().-]\*\\d){9}$",
-);
+export const registerBodyOnePhoneRegExp = new RegExp("^5\\d{9}$");
 export const registerBodyOneFirstNameMax = 100;
 
 export const registerBodyOneLastNameMax = 100;
@@ -38,11 +36,9 @@ export const registerBodyTwoPasswordMin = 6;
 export const registerBodyTwoPasswordMax = 72;
 
 export const registerBodyTwoPhoneMin = 10;
-export const registerBodyTwoPhoneMax = 30;
+export const registerBodyTwoPhoneMax = 10;
 
-export const registerBodyTwoPhoneRegExp = new RegExp(
-  "^(?:(?:\\+|00)?90|0)?[\\s().-]\*5(?:[\\s().-]\*\\d){9}$",
-);
+export const registerBodyTwoPhoneRegExp = new RegExp("^5\\d{9}$");
 export const registerBodyTwoBusinessNameMax = 160;
 
 export const registerBodyTwoAuthorizedFirstNameMax = 100;
@@ -68,7 +64,7 @@ export const RegisterBody = zod.union([
       .max(registerBodyOnePhoneMax)
       .regex(registerBodyOnePhoneRegExp)
       .describe(
-        "Turkish mobile number. The server removes spaces, parentheses, and hyphens; accepts 5XXXXXXXXX, 05XXXXXXXXX, 905XXXXXXXXX, and +905XXXXXXXXX; and stores the canonical 05XXXXXXXXX form.",
+        "Canonical Turkish mobile number: exactly 10 digits starting with 5. Do not include a leading zero, country code, spaces, parentheses, hyphens, or other formatting.",
       ),
     role: zod.enum(["customer"]),
     firstName: zod.string().min(1).max(registerBodyOneFirstNameMax),
@@ -98,7 +94,7 @@ export const RegisterBody = zod.union([
       .max(registerBodyTwoPhoneMax)
       .regex(registerBodyTwoPhoneRegExp)
       .describe(
-        "Turkish mobile number. The server removes spaces, parentheses, and hyphens; accepts 5XXXXXXXXX, 05XXXXXXXXX, 905XXXXXXXXX, and +905XXXXXXXXX; and stores the canonical 05XXXXXXXXX form.",
+        "Canonical Turkish mobile number: exactly 10 digits starting with 5. Do not include a leading zero, country code, spaces, parentheses, hyphens, or other formatting.",
       ),
     role: zod.enum(["barber"]),
     businessName: zod.string().min(1).max(registerBodyTwoBusinessNameMax),
@@ -149,7 +145,9 @@ export const LoginBody = zod.union([
       .string()
       .min(1)
       .max(loginBodyOneIdentifierMax)
-      .describe("Email address or a supported Turkish phone-number form."),
+      .describe(
+        "Email address or a canonical Turkish mobile number: exactly 10 digits starting with 5, without a leading zero, country code, or formatting.",
+      ),
     password: zod
       .string()
       .min(loginBodyOnePasswordMin)
@@ -195,7 +193,9 @@ export const RequestPasswordResetBody = zod.object({
     .string()
     .min(1)
     .max(requestPasswordResetBodyIdentifierMax)
-    .describe("Email address or a supported Turkish phone-number form."),
+    .describe(
+      "Email address or a canonical Turkish mobile number: exactly 10 digits starting with 5, without a leading zero, country code, or formatting.",
+    ),
   channel: zod
     .enum(["email", "phone"])
     .optional()
@@ -337,10 +337,23 @@ export const GetMyBarberProfileResponse = zod.object({
 /**
  * @summary Update current barber's profile
  */
+export const updateMyBarberProfileBodyPhoneMin = 10;
+export const updateMyBarberProfileBodyPhoneMax = 10;
+
+export const updateMyBarberProfileBodyPhoneRegExp = new RegExp("^5\\d{9}$");
+
 export const UpdateMyBarberProfileBody = zod.object({
   shopName: zod.string().optional(),
   shopAddress: zod.string().optional(),
-  phone: zod.string().optional(),
+  phone: zod
+    .string()
+    .min(updateMyBarberProfileBodyPhoneMin)
+    .max(updateMyBarberProfileBodyPhoneMax)
+    .regex(updateMyBarberProfileBodyPhoneRegExp)
+    .optional()
+    .describe(
+      "Canonical Turkish mobile number: exactly 10 digits starting with 5. Do not include a leading zero, country code, spaces, parentheses, hyphens, or other formatting.",
+    ),
   bio: zod.string().optional(),
 });
 

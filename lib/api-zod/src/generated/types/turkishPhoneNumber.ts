@@ -7,9 +7,9 @@
  */
 
 /**
- * Turkish mobile number. The server removes spaces, parentheses, and hyphens; accepts 5XXXXXXXXX, 05XXXXXXXXX, 905XXXXXXXXX, and +905XXXXXXXXX; and stores the canonical 05XXXXXXXXX form.
+ * Canonical Turkish mobile number: exactly 10 digits starting with 5. Do not include a leading zero, country code, spaces, parentheses, hyphens, or other formatting.
  * @minLength 10
- * @maxLength 30
- * @pattern ^(?:(?:\+|00)?90|0)?[\s().-]*5(?:[\s().-]*\d){9}$
+ * @maxLength 10
+ * @pattern ^5\d{9}$
  */
 export type TurkishPhoneNumber = string;
