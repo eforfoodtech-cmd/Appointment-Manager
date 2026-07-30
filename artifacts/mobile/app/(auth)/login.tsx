@@ -20,6 +20,14 @@ import colors from "@/constants/colors";
 import { isTurkishMobilePhone } from "@/utils/phone";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const EMAIL_MAX_LENGTH = 254;
+const PHONE_LENGTH = 10;
+
+function constrainIdentifierInput(value: string) {
+  return /^\d*$/.test(value)
+    ? value.slice(0, PHONE_LENGTH)
+    : value.slice(0, EMAIL_MAX_LENGTH);
+}
 
 function normalizeIdentifier(value: string) {
   const trimmed = value.trim();
@@ -58,7 +66,12 @@ export default function LoginScreen() {
   const handleLogin = () => {
     const normalizedIdentifier = normalizeIdentifier(identifier);
     if (!normalizedIdentifier) {
-      Alert.alert("Hata", "Geçerli bir e-posta veya telefon numarası girin");
+      Alert.alert(
+        "Hata",
+        /^\d+$/.test(identifier)
+          ? "Telefonu başında 0 olmadan, 5 ile başlayan 10 hane girin"
+          : "Geçerli bir e-posta veya telefon numarası girin",
+      );
       return;
     }
     if (password.length < 6 || password.length > 72) {
@@ -103,14 +116,16 @@ export default function LoginScreen() {
             <TextInput
               style={styles.input}
               value={identifier}
-              onChangeText={setIdentifier}
+              onChangeText={(value) =>
+                setIdentifier(constrainIdentifierInput(value))
+              }
               placeholder="ornek@mail.com veya 5551112233"
               placeholderTextColor={colors.light.mutedForeground}
               keyboardType="email-address"
               autoCapitalize="none"
               autoCorrect={false}
               autoComplete="username"
-              maxLength={254}
+              maxLength={EMAIL_MAX_LENGTH}
             />
           </View>
 
