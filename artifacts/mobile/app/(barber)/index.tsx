@@ -49,31 +49,35 @@ export default function BarberDashboard() {
     },
   });
 
-  const handleStatusChange = (
-    id: number,
-    status: "cancelled" | "no_show",
-  ) => {
+  const handleStatusChange = (id: number, status: "cancelled" | "no_show") => {
     updateAppt.mutate({ appointmentId: id, data: { status } });
   };
 
-  const paddingTop =
-    insets.top + (Platform.OS === "web" ? 67 : 0);
+  const paddingTop = insets.top + (Platform.OS === "web" ? 67 : 0);
 
   return (
     <ScrollView
       style={styles.scroll}
       contentContainerStyle={{ paddingTop, paddingBottom: insets.bottom + 100 }}
       refreshControl={
-        <RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={c.primary} />
+        <RefreshControl
+          refreshing={isRefetching}
+          onRefresh={refetch}
+          tintColor={c.primary}
+        />
       }
     >
       {/* Header */}
       <View style={styles.header}>
-        <View>
+        <View style={styles.headerTitleBlock}>
+          <Text style={styles.headerEyebrow}>Bugünün özeti</Text>
           <Text style={styles.greeting}>Merhaba ✂</Text>
           <Text style={styles.dateLabel}>{formatDateDisplay(date)}</Text>
         </View>
-        <Text style={styles.logoText}>Tıraş</Text>
+        <View style={styles.logoBadge}>
+          <Feather name="scissors" size={18} color={c.accent} />
+          <Text style={styles.logoText}>Tıraş</Text>
+        </View>
       </View>
 
       {isLoading ? (
@@ -82,25 +86,60 @@ export default function BarberDashboard() {
         <>
           {/* Stats row */}
           <View style={styles.statsRow}>
-            <StatCard label="Toplam" value={data?.todayCount ?? 0} color={c.primary} />
-            <StatCard label="Bekleyen" value={data?.pendingCount ?? 0} color={c.accent} />
-            <StatCard label="Tamamlanan" value={data?.completedCount ?? 0} color={c.success} />
-            <StatCard label="Gelmedi" value={data?.noShowCount ?? 0} color={c.destructive} />
+            <StatCard
+              label="Toplam"
+              value={data?.todayCount ?? 0}
+              color={c.primary}
+              icon="calendar"
+            />
+            <StatCard
+              label="Bekleyen"
+              value={data?.pendingCount ?? 0}
+              color={c.accent}
+              icon="clock"
+            />
+            <StatCard
+              label="Tamamlanan"
+              value={data?.completedCount ?? 0}
+              color={c.success}
+              icon="check-circle"
+            />
+            <StatCard
+              label="Gelmedi"
+              value={data?.noShowCount ?? 0}
+              color={c.destructive}
+              icon="user-x"
+            />
           </View>
 
           {/* Next appointment highlight */}
           {data?.nextAppointment && (
             <View style={styles.nextCard}>
-              <Text style={styles.nextLabel}>Sıradaki Randevu</Text>
+              <View style={styles.nextHeader}>
+                <View style={styles.nextIcon}>
+                  <Feather name="clock" size={16} color={c.primary} />
+                </View>
+                <Text style={styles.nextLabel}>Sıradaki Randevu</Text>
+              </View>
               <Text style={styles.nextTime}>
-                {data.nextAppointment.startTime} — {data.nextAppointment.endTime}
+                {data.nextAppointment.startTime} —{" "}
+                {data.nextAppointment.endTime}
               </Text>
-              <Text style={styles.nextCustomer}>{data.nextAppointment.customerName}</Text>
+              <Text style={styles.nextCustomer}>
+                {data.nextAppointment.customerName}
+              </Text>
             </View>
           )}
 
           {/* Today's list */}
-          <Text style={styles.sectionTitle}>Bugünün Randevuları</Text>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Bugünün Randevuları</Text>
+            <View style={styles.countBadge}>
+              <Text style={styles.countBadgeText}>
+                {data?.todayAppointments?.length ?? 0}
+              </Text>
+            </View>
+          </View>
 
           {!data?.todayAppointments?.length ? (
             <View style={styles.empty}>
@@ -129,15 +168,22 @@ function StatCard({
   label,
   value,
   color,
+  icon,
 }: {
   label: string;
   value: number;
   color: string;
+  icon: any;
 }) {
   return (
     <View style={[styles.statCard, { borderTopColor: color }]}>
+      <View style={styles.statHeader}>
+        <View style={[styles.statIcon, { backgroundColor: color + "18" }]}>
+          <Feather name={icon} size={15} color={color} />
+        </View>
+        <Text style={styles.statLabel}>{label}</Text>
+      </View>
       <Text style={[styles.statValue, { color }]}>{value}</Text>
-      <Text style={styles.statLabel}>{label}</Text>
     </View>
   );
 }
@@ -156,41 +202,157 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "flex-start",
+    alignItems: "center",
     paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingTop: 18,
+    paddingBottom: 16,
   },
-  greeting: { fontSize: 22, fontFamily: "Inter_700Bold", color: c.foreground },
-  dateLabel: { fontSize: 13, fontFamily: "Inter_400Regular", color: c.mutedForeground, marginTop: 2 },
-  logoText: { fontSize: 20, fontFamily: "Inter_700Bold", color: c.primary, letterSpacing: 1 },
-  statsRow: { flexDirection: "row", gap: 10, paddingHorizontal: 20, marginBottom: 16 },
+  headerTitleBlock: { flex: 1 },
+  headerEyebrow: {
+    fontSize: 12,
+    fontFamily: "Inter_700Bold",
+    color: c.accent,
+    marginBottom: 3,
+  },
+  greeting: { fontSize: 26, fontFamily: "Inter_700Bold", color: c.foreground },
+  dateLabel: {
+    fontSize: 13,
+    fontFamily: "Inter_400Regular",
+    color: c.mutedForeground,
+    marginTop: 2,
+  },
+  logoBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+    backgroundColor: c.card,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: c.border,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  logoText: {
+    fontSize: 15,
+    fontFamily: "Inter_700Bold",
+    color: c.primary,
+    letterSpacing: 0,
+  },
+  statsRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+    paddingHorizontal: 20,
+    marginBottom: 18,
+  },
   statCard: {
-    flex: 1,
+    flexBasis: "48%",
+    flexGrow: 1,
     backgroundColor: c.card,
     borderRadius: colors.radius,
-    paddingVertical: 14,
-    paddingHorizontal: 8,
-    alignItems: "center",
-    borderTopWidth: 3,
+    padding: 14,
+    borderTopWidth: 4,
     shadowColor: "#000",
-    shadowOpacity: 0.04,
-    shadowRadius: 4,
-    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
     elevation: 2,
+    borderWidth: 1,
+    borderColor: c.border,
   },
-  statValue: { fontSize: 22, fontFamily: "Inter_700Bold" },
-  statLabel: { fontSize: 10, fontFamily: "Inter_500Medium", color: c.mutedForeground, marginTop: 2, textAlign: "center" },
+  statHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 10,
+  },
+  statIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  statValue: { fontSize: 28, fontFamily: "Inter_700Bold" },
+  statLabel: {
+    fontSize: 12,
+    fontFamily: "Inter_600SemiBold",
+    color: c.mutedForeground,
+    flex: 1,
+  },
   nextCard: {
     marginHorizontal: 20,
     marginBottom: 20,
-    backgroundColor: c.primary,
+    backgroundColor: c.card,
     borderRadius: colors.radius,
-    padding: 16,
+    padding: 18,
+    borderWidth: 1,
+    borderColor: c.border,
+    borderTopWidth: 4,
+    borderTopColor: c.accent,
+    shadowColor: "#000",
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 5 },
+    elevation: 3,
   },
-  nextLabel: { fontSize: 12, fontFamily: "Inter_500Medium", color: "rgba(255,255,255,0.7)", marginBottom: 4 },
-  nextTime: { fontSize: 22, fontFamily: "Inter_700Bold", color: "#fff" },
-  nextCustomer: { fontSize: 15, fontFamily: "Inter_500Medium", color: "rgba(255,255,255,0.9)", marginTop: 4 },
-  sectionTitle: { fontSize: 16, fontFamily: "Inter_600SemiBold", color: c.foreground, paddingHorizontal: 20, marginBottom: 8 },
+  nextHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 10,
+  },
+  nextIcon: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: c.secondary,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  nextLabel: {
+    fontSize: 12,
+    fontFamily: "Inter_500Medium",
+    color: c.mutedForeground,
+  },
+  nextTime: { fontSize: 22, fontFamily: "Inter_700Bold", color: c.primary },
+  nextCustomer: {
+    fontSize: 15,
+    fontFamily: "Inter_500Medium",
+    color: c.foreground,
+    marginTop: 4,
+  },
+  sectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 20,
+    marginBottom: 10,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontFamily: "Inter_600SemiBold",
+    color: c.foreground,
+  },
+  countBadge: {
+    minWidth: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: c.secondary,
+    borderWidth: 1,
+    borderColor: c.border,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  countBadgeText: {
+    fontSize: 12,
+    fontFamily: "Inter_700Bold",
+    color: c.primary,
+  },
   empty: { alignItems: "center", paddingVertical: 60, gap: 12 },
-  emptyText: { fontSize: 15, fontFamily: "Inter_400Regular", color: c.mutedForeground },
+  emptyText: {
+    fontSize: 15,
+    fontFamily: "Inter_400Regular",
+    color: c.mutedForeground,
+  },
 });

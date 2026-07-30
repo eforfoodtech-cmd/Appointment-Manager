@@ -9,25 +9,32 @@ import {
   Platform,
   ActivityIndicator,
   Alert,
+  type TextInputProps,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { router } from "expo-router";
+import { Feather } from "@expo/vector-icons";
 import { useRegister } from "@workspace/api-client-react";
 import { useAuth } from "@/context/AuthContext";
+import { AuthBackgroundTexture } from "@/components/AuthBackgroundTexture";
 import colors from "@/constants/colors";
 
 type Role = "barber" | "customer";
-const PIN_RE = /^\d{6}$/;
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function RegisterScreen() {
   const insets = useSafeAreaInsets();
   const { setAuth } = useAuth();
   const [role, setRole] = useState<Role>("customer");
-  const [name, setName] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
-  const [shopName, setShopName] = useState("");
-  const [shopAddress, setShopAddress] = useState("");
+  const [businessName, setBusinessName] = useState("");
+  const [authorizedFirstName, setAuthorizedFirstName] = useState("");
+  const [authorizedLastName, setAuthorizedLastName] = useState("");
+  const [address, setAddress] = useState("");
 
   const registerMutation = useRegister({
     mutation: {
@@ -46,38 +53,65 @@ export default function RegisterScreen() {
   });
 
   const handleRegister = () => {
-    if (!name.trim()) {
-      Alert.alert("Hata", "Ad Soyad zorunlu");
+    if (role === "customer" && (!firstName.trim() || !lastName.trim())) {
+      Alert.alert("Hata", "Ad ve soyad zorunludur");
       return;
     }
-    if (phone.length !== 10) {
-      Alert.alert("Hata", "Telefon numarası 10 haneli olmalı");
+    if (
+      role === "barber" &&
+      (!businessName.trim() ||
+        !authorizedFirstName.trim() ||
+        !authorizedLastName.trim() ||
+        !address.trim())
+    ) {
+      Alert.alert(
+        "Hata",
+        "İşletme adı, yetkili adı, yetkili soyadı ve açık adres zorunludur",
+      );
       return;
     }
-    if (!password.trim()) {
-      Alert.alert("Hata", "Şifre zorunlu");
+    if (!EMAIL_RE.test(email.trim())) {
+      Alert.alert("Hata", "Geçerli bir e-posta adresi girin");
       return;
     }
-    if (!PIN_RE.test(password)) {
-      Alert.alert("Hata", "Şifre 6 haneli rakamlardan oluşmalı");
+    if (!/^5\d{9}$/.test(phone)) {
+      Alert.alert(
+        "Hata",
+        "Telefon numarası 5 ile başlayan 10 haneli bir numara olmalı",
+      );
       return;
     }
-    if (role === "barber" && !shopName.trim()) {
-      Alert.alert("Hata", "Berber kaydı için işletme adı zorunludur");
+    if (password.length < 6 || password.length > 72) {
+      Alert.alert("Hata", "Şifre 6-72 karakter arasında olmalı");
+      return;
+    }
+
+    const account = {
+      email: email.trim().toLowerCase(),
+      password,
+      phone: `0${phone}`,
+    };
+
+    if (role === "customer") {
+      registerMutation.mutate({
+        data: {
+          ...account,
+          role: "customer",
+          firstName: firstName.trim(),
+          lastName: lastName.trim(),
+        },
+      });
       return;
     }
 
     registerMutation.mutate({
       data: {
-        name: name.trim(),
-        email: `0${phone}`,
-        password,
-        phone: `0${phone}`,
-        role,
-        ...(role === "barber" && {
-          shopName: shopName.trim(),
-          shopAddress: shopAddress.trim() || undefined,
-        }),
+        ...account,
+        role: "barber",
+        businessName: businessName.trim(),
+        authorizedFirstName: authorizedFirstName.trim(),
+        authorizedLastName: authorizedLastName.trim(),
+        address: address.trim(),
       },
     });
   };
@@ -89,72 +123,176 @@ export default function RegisterScreen() {
       style={styles.scroll}
       contentContainerStyle={[
         styles.container,
-        { paddingTop: insets.top + (Platform.OS === "web" ? 67 : 16), paddingBottom: insets.bottom + 24 },
+        {
+          paddingTop: insets.top + (Platform.OS === "web" ? 67 : 16),
+          paddingBottom: insets.bottom + 24,
+        },
       ]}
       keyboardShouldPersistTaps="handled"
     >
-      <TouchableOpacity style={styles.back} onPress={() => router.back()}>
-        <Text style={styles.backText}>← Geri</Text>
-      </TouchableOpacity>
-
-      <Text style={styles.title}>Kayıt Ol</Text>
-      <Text style={styles.subtitle}>Hesabınızı oluşturun</Text>
-
-      {/* Role selector */}
-      <View style={styles.roleRow}>
-        {(["customer", "barber"] as Role[]).map((r) => (
-          <TouchableOpacity
-            key={r}
-            style={[styles.roleBtn, role === r && styles.roleBtnActive]}
-            onPress={() => setRole(r)}
-            activeOpacity={0.7}
-          >
-            <Text style={[styles.roleBtnText, role === r && styles.roleBtnTextActive]}>
-              {r === "customer" ? "Müşteri" : "Berber"}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      <Field label="Ad Soyad" value={name} onChangeText={setName} placeholder="Ali Yılmaz" />
-      <View style={styles.inputGroup}>
-        <Text style={styles.label}>Telefon Numarası</Text>
-        <View style={styles.phoneInput}>
-          <Text style={styles.phonePrefix}>0</Text>
-          <TextInput
-            style={styles.phoneField}
-            value={phone}
-            onChangeText={(text) => setPhone(text.replace(/\D/g, "").slice(0, 10))}
-            placeholder="5551112233"
-            placeholderTextColor={c.mutedForeground}
-            keyboardType="number-pad"
-            autoCapitalize="none"
-            maxLength={10}
-            autoComplete="tel"
-          />
+      <AuthBackgroundTexture />
+      <View style={styles.authCard}>
+        <View style={styles.barberStripe}>
+          <View style={[styles.stripeSegment, styles.stripeRed]} />
+          <View style={[styles.stripeSegment, styles.stripeLight]} />
+          <View style={[styles.stripeSegment, styles.stripeBlue]} />
+          <View style={[styles.stripeSegment, styles.stripeGold]} />
         </View>
-      </View>
-      <Field label="Şifre" value={password} onChangeText={setPassword} placeholder="6 haneli şifre" secureTextEntry keyboardType="number-pad" maxLength={6} />
+        <TouchableOpacity style={styles.back} onPress={() => router.back()}>
+          <Feather name="chevron-left" size={18} color={c.primary} />
+          <Text style={styles.backText}>Geri</Text>
+        </TouchableOpacity>
 
-      {role === "barber" && (
-        <>
-          <Field label="İşletme Adı" value={shopName} onChangeText={setShopName} placeholder="Salon adınız" />
-          <Field label="Adres (isteğe bağlı)" value={shopAddress} onChangeText={setShopAddress} placeholder="İlçe, Şehir" />
-        </>
-      )}
+        <View style={styles.hero}>
+          <View style={styles.heroIcon}>
+            <Feather name="user-plus" size={22} color={c.accent} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.title}>Kayıt Ol</Text>
+            <Text style={styles.subtitle}>Hesabınızı oluşturun</Text>
+          </View>
+        </View>
 
-      <TouchableOpacity
-        style={[styles.button, registerMutation.isPending && styles.buttonDisabled]}
-        onPress={handleRegister}
-        disabled={registerMutation.isPending}
-        activeOpacity={0.8}
-      >
-        {registerMutation.isPending ? (
-          <ActivityIndicator color="#fff" />
+        {/* Role selector */}
+        <View style={styles.roleRow}>
+          {(["customer", "barber"] as Role[]).map((r) => (
+            <TouchableOpacity
+              key={r}
+              style={[styles.roleBtn, role === r && styles.roleBtnActive]}
+              onPress={() => setRole(r)}
+              activeOpacity={0.7}
+            >
+              <Feather
+                name={r === "customer" ? "user" : "scissors"}
+                size={17}
+                color={role === r ? c.primaryForeground : c.mutedForeground}
+              />
+              <Text
+                style={[
+                  styles.roleBtnText,
+                  role === r && styles.roleBtnTextActive,
+                ]}
+              >
+                {r === "customer" ? "Müşteri" : "Berber"}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {role === "customer" ? (
+          <>
+            <Field
+              label="Ad"
+              value={firstName}
+              onChangeText={setFirstName}
+              placeholder="Ali"
+              autoComplete="given-name"
+              maxLength={100}
+            />
+            <Field
+              label="Soyad"
+              value={lastName}
+              onChangeText={setLastName}
+              placeholder="Yılmaz"
+              autoComplete="family-name"
+              maxLength={100}
+            />
+          </>
         ) : (
-          <Text style={styles.buttonText}>Kayıt Ol</Text>
+          <>
+            <Field
+              label="İşletme Adı"
+              value={businessName}
+              onChangeText={setBusinessName}
+              placeholder="Örnek Berber Salonu"
+              autoComplete="organization"
+              maxLength={160}
+            />
+            <Field
+              label="Yetkili Adı"
+              value={authorizedFirstName}
+              onChangeText={setAuthorizedFirstName}
+              placeholder="Ali"
+              autoComplete="given-name"
+              maxLength={100}
+            />
+            <Field
+              label="Yetkili Soyadı"
+              value={authorizedLastName}
+              onChangeText={setAuthorizedLastName}
+              placeholder="Yılmaz"
+              autoComplete="family-name"
+              maxLength={100}
+            />
+            <Field
+              label="Açık Adres"
+              value={address}
+              onChangeText={setAddress}
+              placeholder="Mahalle, cadde, sokak, bina no, ilçe/il"
+              autoComplete="street-address"
+              multiline
+              numberOfLines={3}
+              maxLength={500}
+            />
+          </>
         )}
-      </TouchableOpacity>
+        <Field
+          label="E-posta"
+          value={email}
+          onChangeText={setEmail}
+          placeholder="ornek@mail.com"
+          keyboardType="email-address"
+          autoCapitalize="none"
+          autoCorrect={false}
+          autoComplete="email"
+          maxLength={254}
+        />
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>Telefon Numarası</Text>
+          <View style={styles.phoneInput}>
+            <Text style={styles.phonePrefix}>0</Text>
+            <TextInput
+              style={styles.phoneField}
+              value={phone}
+              onChangeText={(text) =>
+                setPhone(text.replace(/\D/g, "").slice(0, 10))
+              }
+              placeholder="5551112233"
+              placeholderTextColor={c.mutedForeground}
+              keyboardType="number-pad"
+              autoCapitalize="none"
+              maxLength={10}
+              autoComplete="tel"
+            />
+          </View>
+        </View>
+        <Field
+          label="Şifre"
+          value={password}
+          onChangeText={setPassword}
+          placeholder="En az 6 karakter"
+          secureTextEntry
+          maxLength={72}
+          autoCapitalize="none"
+          autoComplete="new-password"
+        />
+
+        <TouchableOpacity
+          style={[
+            styles.button,
+            registerMutation.isPending && styles.buttonDisabled,
+          ]}
+          onPress={handleRegister}
+          disabled={registerMutation.isPending}
+          activeOpacity={0.8}
+        >
+          {registerMutation.isPending ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text style={styles.buttonText}>Kayıt Ol</Text>
+          )}
+        </TouchableOpacity>
+      </View>
     </ScrollView>
   );
 }
@@ -168,23 +306,39 @@ function Field({
   keyboardType,
   autoCapitalize,
   maxLength,
+  autoCorrect,
+  autoComplete,
+  multiline,
+  numberOfLines,
 }: {
   label: string;
   value: string;
   onChangeText: (v: string) => void;
   placeholder?: string;
   secureTextEntry?: boolean;
-  keyboardType?: any;
-  autoCapitalize?: any;
+  keyboardType?: TextInputProps["keyboardType"];
+  autoCapitalize?: TextInputProps["autoCapitalize"];
   maxLength?: number;
+  autoCorrect?: boolean;
+  autoComplete?: TextInputProps["autoComplete"];
+  multiline?: boolean;
+  numberOfLines?: number;
 }) {
   const c = colors.light;
   return (
-    <View style={{ gap: 6, marginBottom: 4 }}>
-      <Text style={{ fontSize: 13, fontFamily: "Inter_500Medium", color: c.mutedForeground }}>{label}</Text>
+    <View style={{ gap: 6, marginBottom: 4, paddingHorizontal: 20 }}>
+      <Text
+        style={{
+          fontSize: 13,
+          fontFamily: "Inter_500Medium",
+          color: c.mutedForeground,
+        }}
+      >
+        {label}
+      </Text>
       <TextInput
         style={{
-          backgroundColor: c.card,
+          backgroundColor: c.background,
           borderRadius: colors.radius,
           paddingHorizontal: 16,
           paddingVertical: 13,
@@ -200,8 +354,13 @@ function Field({
         placeholderTextColor={c.mutedForeground}
         secureTextEntry={secureTextEntry}
         keyboardType={keyboardType}
-        autoCapitalize={autoCapitalize || "words"}
+        autoCapitalize={autoCapitalize ?? "words"}
         maxLength={maxLength}
+        autoCorrect={autoCorrect}
+        autoComplete={autoComplete}
+        multiline={multiline}
+        numberOfLines={numberOfLines}
+        textAlignVertical={multiline ? "top" : "center"}
       />
     </View>
   );
@@ -211,19 +370,86 @@ const c = colors.light;
 
 const styles = StyleSheet.create({
   scroll: { flex: 1, backgroundColor: c.background },
-  container: { paddingHorizontal: 24, gap: 12 },
-  back: { marginBottom: 8 },
+  container: {
+    flexGrow: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    position: "relative",
+  },
+  authCard: {
+    width: "100%",
+    maxWidth: 520,
+    backgroundColor: c.card,
+    borderRadius: 24,
+    gap: 13,
+    borderWidth: 1,
+    borderColor: c.border,
+    overflow: "hidden",
+    shadowColor: "#000",
+    shadowOpacity: 0.18,
+    shadowRadius: 24,
+    shadowOffset: { width: 0, height: 14 },
+    elevation: 8,
+    zIndex: 1,
+  },
+  barberStripe: {
+    flexDirection: "row",
+    height: 8,
+    backgroundColor: c.card,
+  },
+  stripeSegment: { flex: 1 },
+  stripeRed: { backgroundColor: "#C94B4B" },
+  stripeLight: { backgroundColor: "#F7F3E9" },
+  stripeBlue: { backgroundColor: "#2F5F8F" },
+  stripeGold: { backgroundColor: c.accent },
+  back: {
+    alignSelf: "flex-start",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    marginBottom: 4,
+    paddingVertical: 8,
+    paddingHorizontal: 20,
+    marginTop: 12,
+  },
   backText: { fontSize: 15, fontFamily: "Inter_500Medium", color: c.primary },
-  title: { fontSize: 28, fontFamily: "Inter_700Bold", color: c.foreground },
-  subtitle: { fontSize: 15, fontFamily: "Inter_400Regular", color: c.mutedForeground, marginBottom: 4 },
+  hero: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+    backgroundColor: c.secondary,
+    borderRadius: colors.radius,
+    borderWidth: 1,
+    borderColor: c.border,
+    padding: 16,
+    marginHorizontal: 20,
+  },
+  heroIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: c.card,
+    borderWidth: 1,
+    borderColor: c.border,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  title: { fontSize: 24, fontFamily: "Inter_700Bold", color: c.primary },
+  subtitle: {
+    fontSize: 14,
+    fontFamily: "Inter_400Regular",
+    color: c.mutedForeground,
+    marginTop: 2,
+  },
   label: {
     fontSize: 13,
     fontFamily: "Inter_500Medium",
     color: c.mutedForeground,
   },
-  inputGroup: { gap: 6, marginBottom: 4 },
+  inputGroup: { gap: 6, marginBottom: 4, paddingHorizontal: 20 },
   phoneInput: {
-    backgroundColor: c.card,
+    backgroundColor: c.background,
     borderRadius: colors.radius,
     borderWidth: 1,
     borderColor: c.border,
@@ -244,15 +470,23 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_400Regular",
     color: c.foreground,
   },
-  roleRow: { flexDirection: "row", gap: 12, marginBottom: 4 },
+  roleRow: {
+    flexDirection: "row",
+    gap: 12,
+    marginBottom: 4,
+    paddingHorizontal: 20,
+  },
   roleBtn: {
     flex: 1,
+    flexDirection: "row",
+    gap: 8,
     paddingVertical: 13,
     borderRadius: colors.radius,
-    backgroundColor: c.secondary,
+    backgroundColor: c.card,
     alignItems: "center",
-    borderWidth: 2,
-    borderColor: "transparent",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: c.border,
   },
   roleBtnActive: {
     backgroundColor: c.primary,
@@ -272,7 +506,18 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     alignItems: "center",
     marginTop: 12,
+    marginHorizontal: 20,
+    marginBottom: 20,
+    shadowColor: c.primary,
+    shadowOpacity: 0.2,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 5 },
+    elevation: 3,
   },
   buttonDisabled: { opacity: 0.7 },
-  buttonText: { color: c.primaryForeground, fontSize: 16, fontFamily: "Inter_600SemiBold" },
+  buttonText: {
+    color: c.primaryForeground,
+    fontSize: 16,
+    fontFamily: "Inter_600SemiBold",
+  },
 });

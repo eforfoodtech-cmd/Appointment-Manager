@@ -45,11 +45,15 @@ function ClassicTabLayout() {
         headerShown: false,
         tabBarStyle: {
           position: "absolute",
-          backgroundColor: isIOS ? "transparent" : colors.background,
-          borderTopWidth: isWeb ? 1 : 0,
+          backgroundColor: isIOS ? "transparent" : colors.card,
+          borderTopWidth: 1,
           borderTopColor: colors.border,
-          elevation: 0,
-          ...(isWeb ? { height: 84 } : {}),
+          elevation: 8,
+          shadowColor: "#000",
+          shadowOpacity: 0.07,
+          shadowRadius: 12,
+          shadowOffset: { width: 0, height: -4 },
+          ...(isWeb ? { height: 76, paddingTop: 8, paddingBottom: 8 } : {}),
         },
         tabBarBackground: () =>
           isIOS ? (
@@ -59,7 +63,12 @@ function ClassicTabLayout() {
               style={StyleSheet.absoluteFill}
             />
           ) : isWeb ? (
-            <View style={[StyleSheet.absoluteFill, { backgroundColor: colors.background }]} />
+            <View
+              style={[
+                StyleSheet.absoluteFill,
+                { backgroundColor: colors.card },
+              ]}
+            />
           ) : null,
       }}
     >
@@ -67,21 +76,27 @@ function ClassicTabLayout() {
         name="index"
         options={{
           title: "Özet",
-          tabBarIcon: ({ color }) => <Feather name="home" size={22} color={color} />,
+          tabBarIcon: ({ color }) => (
+            <Feather name="home" size={22} color={color} />
+          ),
         }}
       />
       <Tabs.Screen
         name="customers"
         options={{
           title: "Müşteriler",
-          tabBarIcon: ({ color }) => <Feather name="users" size={22} color={color} />,
+          tabBarIcon: ({ color }) => (
+            <Feather name="users" size={22} color={color} />
+          ),
         }}
       />
       <Tabs.Screen
         name="slots"
         options={{
           title: "Slotlar",
-          tabBarIcon: ({ color }) => <Feather name="calendar" size={22} color={color} />,
+          tabBarIcon: ({ color }) => (
+            <Feather name="calendar" size={22} color={color} />
+          ),
         }}
       />
       <Tabs.Screen name="messages" options={{ href: null }} />
@@ -89,7 +104,9 @@ function ClassicTabLayout() {
         name="profile"
         options={{
           title: "Profil",
-          tabBarIcon: ({ color }) => <Feather name="user" size={22} color={color} />,
+          tabBarIcon: ({ color }) => (
+            <Feather name="user" size={22} color={color} />
+          ),
         }}
       />
     </Tabs>

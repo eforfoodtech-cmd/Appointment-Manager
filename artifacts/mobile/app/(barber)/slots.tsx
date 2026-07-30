@@ -36,6 +36,7 @@ import {
 } from "@workspace/api-client-react";
 import type { SlotAppointmentDetail } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
+import { PressableScale } from "@/components/PressableScale";
 import { useToast } from "@/components/Toast";
 import colors from "@/constants/colors";
 import { formatTimeInput, normalizeTimeInput } from "@/utils/timeInput";
@@ -63,7 +64,9 @@ function formatDay(dateStr: string) {
 }
 
 function getNowIstanbul() {
-  const str = new Date().toLocaleString("sv-SE", { timeZone: "Europe/Istanbul" });
+  const str = new Date().toLocaleString("sv-SE", {
+    timeZone: "Europe/Istanbul",
+  });
   const [datePart, timePart] = str.split(" ");
   const [hStr, mStr] = (timePart ?? "00:00").split(":");
   return {
@@ -98,17 +101,39 @@ interface CustomerDetailModalProps {
   onClose: () => void;
 }
 
-function CustomerDetailModal({ visible, slotTime, appointment, isPast, cancelling, onCancel, onClose }: CustomerDetailModalProps) {
+function CustomerDetailModal({
+  visible,
+  slotTime,
+  appointment,
+  isPast,
+  cancelling,
+  onCancel,
+  onClose,
+}: CustomerDetailModalProps) {
   if (!appointment) return null;
   const statusColor = STATUS_COLORS[appointment.status] ?? c.mutedForeground;
   const statusLabel = STATUS_LABELS[appointment.status] ?? appointment.status;
-  const isActive = appointment.status === "pending" || appointment.status === "confirmed";
+  const isActive =
+    appointment.status === "pending" || appointment.status === "confirmed";
   const canCancelManual = appointment.isManual && isActive && !isPast;
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={onClose}>
-        <TouchableOpacity style={styles.detailModal} activeOpacity={1} onPress={() => {}}>
+    <Modal
+      visible={visible}
+      transparent
+      animationType="slide"
+      onRequestClose={onClose}
+    >
+      <TouchableOpacity
+        style={styles.modalOverlay}
+        activeOpacity={1}
+        onPress={onClose}
+      >
+        <TouchableOpacity
+          style={styles.detailModal}
+          activeOpacity={1}
+          onPress={() => {}}
+        >
           {/* Handle bar */}
           <View style={styles.handleBar} />
 
@@ -116,9 +141,18 @@ function CustomerDetailModal({ visible, slotTime, appointment, isPast, cancellin
           <Text style={styles.detailSlotTime}>{slotTime}</Text>
 
           {/* Status badge */}
-          <View style={[styles.statusBadge, { backgroundColor: statusColor + "20" }]}>
-            <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
-            <Text style={[styles.statusText, { color: statusColor }]}>{statusLabel}</Text>
+          <View
+            style={[
+              styles.statusBadge,
+              { backgroundColor: statusColor + "20" },
+            ]}
+          >
+            <View
+              style={[styles.statusDot, { backgroundColor: statusColor }]}
+            />
+            <Text style={[styles.statusText, { color: statusColor }]}>
+              {statusLabel}
+            </Text>
           </View>
 
           {/* Customer info */}
@@ -136,7 +170,9 @@ function CustomerDetailModal({ visible, slotTime, appointment, isPast, cancellin
             {appointment.customerPhone ? (
               <TouchableOpacity
                 style={styles.infoRow}
-                onPress={() => Linking.openURL(`tel:${appointment.customerPhone}`)}
+                onPress={() =>
+                  Linking.openURL(`tel:${appointment.customerPhone}`)
+                }
                 activeOpacity={0.7}
               >
                 <View style={styles.infoIconWrap}>
@@ -144,9 +180,15 @@ function CustomerDetailModal({ visible, slotTime, appointment, isPast, cancellin
                 </View>
                 <View style={styles.infoContent}>
                   <Text style={styles.infoLabel}>Telefon</Text>
-                  <Text style={[styles.infoValue, styles.infoLink]}>{appointment.customerPhone}</Text>
+                  <Text style={[styles.infoValue, styles.infoLink]}>
+                    {appointment.customerPhone}
+                  </Text>
                 </View>
-                <Feather name="chevron-right" size={16} color={c.mutedForeground} />
+                <Feather
+                  name="chevron-right"
+                  size={16}
+                  color={c.mutedForeground}
+                />
               </TouchableOpacity>
             ) : (
               <View style={styles.infoRow}>
@@ -155,7 +197,11 @@ function CustomerDetailModal({ visible, slotTime, appointment, isPast, cancellin
                 </View>
                 <View style={styles.infoContent}>
                   <Text style={styles.infoLabel}>Telefon</Text>
-                  <Text style={[styles.infoValue, { color: c.mutedForeground }]}>Belirtilmemiş</Text>
+                  <Text
+                    style={[styles.infoValue, { color: c.mutedForeground }]}
+                  >
+                    Belirtilmemiş
+                  </Text>
                 </View>
               </View>
             )}
@@ -182,11 +228,19 @@ function CustomerDetailModal({ visible, slotTime, appointment, isPast, cancellin
 
           {canCancelManual ? (
             <View style={styles.detailActions}>
-              <TouchableOpacity style={[styles.closeBtn, { flex: 1 }]} onPress={onClose} activeOpacity={0.8}>
+              <TouchableOpacity
+                style={[styles.closeBtn, { flex: 1 }]}
+                onPress={onClose}
+                activeOpacity={0.8}
+              >
                 <Text style={styles.closeBtnText}>Kapat</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.detailCancelBtn, { flex: 1 }, cancelling && { opacity: 0.7 }]}
+                style={[
+                  styles.detailCancelBtn,
+                  { flex: 1 },
+                  cancelling && { opacity: 0.7 },
+                ]}
                 onPress={onCancel}
                 activeOpacity={0.8}
                 disabled={cancelling}
@@ -194,12 +248,18 @@ function CustomerDetailModal({ visible, slotTime, appointment, isPast, cancellin
                 {cancelling ? (
                   <ActivityIndicator color="#fff" size="small" />
                 ) : (
-                  <Text style={styles.detailCancelText}>Randevuyu İptal Et</Text>
+                  <Text style={styles.detailCancelText}>
+                    Randevuyu İptal Et
+                  </Text>
                 )}
               </TouchableOpacity>
             </View>
           ) : (
-            <TouchableOpacity style={styles.closeBtn} onPress={onClose} activeOpacity={0.8}>
+            <TouchableOpacity
+              style={styles.closeBtn}
+              onPress={onClose}
+              activeOpacity={0.8}
+            >
               <Text style={styles.closeBtnText}>Kapat</Text>
             </TouchableOpacity>
           )}
@@ -246,7 +306,9 @@ export default function SlotsScreen() {
 
   const invalidateSlots = () =>
     queryClient.invalidateQueries({
-      predicate: (q) => typeof q.queryKey[0] === "string" && (q.queryKey[0] as string).includes("/slots"),
+      predicate: (q) =>
+        typeof q.queryKey[0] === "string" &&
+        (q.queryKey[0] as string).includes("/slots"),
     });
 
   const slotsQueryKey = barberId
@@ -273,9 +335,7 @@ export default function SlotsScreen() {
         const prev = queryClient.getQueryData(slotsQueryKey);
         queryClient.setQueryData(slotsQueryKey, (old: any) =>
           Array.isArray(old)
-            ? old.map((s: any) =>
-                s.id === slotId ? { ...s, ...data } : s,
-              )
+            ? old.map((s: any) => (s.id === slotId ? { ...s, ...data } : s))
             : old,
         );
         return { prev };
@@ -342,7 +402,9 @@ export default function SlotsScreen() {
   const setAvailability = useSetMyAvailability({
     mutation: {
       onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: getGetMyAvailabilityQueryKey() });
+        queryClient.invalidateQueries({
+          queryKey: getGetMyAvailabilityQueryKey(),
+        });
         queryClient.invalidateQueries({
           predicate: (q) =>
             typeof q.queryKey[0] === "string" &&
@@ -357,7 +419,9 @@ export default function SlotsScreen() {
 
   const handleToggleTemplateDay = () => {
     queryClient.invalidateQueries({
-      predicate: (q) => typeof q.queryKey[0] === "string" && (q.queryKey[0] as string).includes("/slots"),
+      predicate: (q) =>
+        typeof q.queryKey[0] === "string" &&
+        (q.queryKey[0] as string).includes("/slots"),
     });
   };
 
@@ -397,17 +461,28 @@ export default function SlotsScreen() {
   };
 
   const handleDelete = (slotId: number) => {
-    Alert.alert("Sil", "Bu saat aralığını silmek istediğinizden emin misiniz?", [
-      { text: "İptal", style: "cancel" },
-      {
-        text: "Sil",
-        style: "destructive",
-        onPress: () => deleteSlot.mutate({ slotId }),
-      },
-    ]);
+    Alert.alert(
+      "Sil",
+      "Bu saat aralığını silmek istediğinizden emin misiniz?",
+      [
+        { text: "İptal", style: "cancel" },
+        {
+          text: "Sil",
+          style: "destructive",
+          onPress: () => deleteSlot.mutate({ slotId }),
+        },
+      ],
+    );
   };
 
-  const handleSlotPress = (slot: { id: number; startTime: string; endTime: string; isBooked: boolean; isAvailable: boolean; appointment?: SlotAppointmentDetail | null }) => {
+  const handleSlotPress = (slot: {
+    id: number;
+    startTime: string;
+    endTime: string;
+    isBooked: boolean;
+    isAvailable: boolean;
+    appointment?: SlotAppointmentDetail | null;
+  }) => {
     if (slot.isBooked && slot.appointment) {
       setDetailSlot({
         time: `${slot.startTime} – ${slot.endTime}`,
@@ -434,19 +509,30 @@ export default function SlotsScreen() {
   };
 
   const paddingTop = insets.top + (Platform.OS === "web" ? 67 : 0);
+  const selectedDateDisplay = new Date(
+    selectedDate + "T12:00:00",
+  ).toLocaleDateString("tr-TR", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  });
 
   return (
     <View style={[styles.container, { paddingTop }]}>
       {/* Title */}
       <View style={styles.titleRow}>
-        <Text style={styles.title}>Saat Aralıkları</Text>
-        <TouchableOpacity
+        <View style={styles.titleBlock}>
+          <Text style={styles.title}>Saat Aralıkları</Text>
+          <Text style={styles.titleMeta}>{selectedDateDisplay}</Text>
+        </View>
+        <PressableScale
           style={styles.addBtn}
           onPress={() => setShowAddModal(true)}
-          activeOpacity={0.8}
+          scaleTo={0.96}
         >
-          <Feather name="plus" size={20} color="#fff" />
-        </TouchableOpacity>
+          <Feather name="plus" size={18} color="#fff" />
+          <Text style={styles.addBtnText}>Ekle</Text>
+        </PressableScale>
       </View>
 
       {/* Day selector — fixed-height wrapper so slot list always starts at same Y */}
@@ -457,18 +543,31 @@ export default function SlotsScreen() {
           contentContainerStyle={styles.daysRow}
         >
           {days.map((d) => {
-            const { day, date } = formatDay(d);
+            const { day, date, month } = formatDay(d);
             const isSelected = d === selectedDate;
             return (
-              <TouchableOpacity
+              <PressableScale
                 key={d}
                 style={[styles.dayBtn, isSelected && styles.dayBtnActive]}
                 onPress={() => setSelectedDate(d)}
-                activeOpacity={0.7}
+                scaleTo={0.95}
               >
-                <Text style={[styles.dayName, isSelected && styles.dayNameActive]}>{day}</Text>
-                <Text style={[styles.dayDate, isSelected && styles.dayDateActive]}>{date}</Text>
-              </TouchableOpacity>
+                <Text
+                  style={[styles.dayName, isSelected && styles.dayNameActive]}
+                >
+                  {day}
+                </Text>
+                <Text
+                  style={[styles.dayDate, isSelected && styles.dayDateActive]}
+                >
+                  {date}
+                </Text>
+                <Text
+                  style={[styles.dayMonth, isSelected && styles.dayMonthActive]}
+                >
+                  {month}
+                </Text>
+              </PressableScale>
             );
           })}
         </ScrollView>
@@ -485,7 +584,10 @@ export default function SlotsScreen() {
           style={{ flex: 1 }}
           data={slots ?? []}
           keyExtractor={(s) => String(s.id)}
-          contentContainerStyle={[styles.slotList, { paddingBottom: insets.bottom + 90 }]}
+          contentContainerStyle={[
+            styles.slotList,
+            { paddingBottom: insets.bottom + 90 },
+          ]}
           ListEmptyComponent={
             <View style={styles.empty}>
               <Feather name="clock" size={40} color={c.border} />
@@ -495,34 +597,58 @@ export default function SlotsScreen() {
           renderItem={({ item: slot }) => {
             const isPast = isPastSlot(slot.startTime);
             return (
-              <TouchableOpacity
-                activeOpacity={0.7}
+              <PressableScale
                 onPress={() => handleSlotPress(slot)}
                 disabled={!slot.isBooked && (!slot.isAvailable || isPast)}
+                scaleTo={0.985}
               >
                 <View
                   style={[
                     styles.slotRow,
-                    slot.isBooked && !isPast && (slot.appointment?.isManual ? styles.slotRowManual : styles.slotRowBooked),
+                    slot.isBooked &&
+                      !isPast &&
+                      (slot.appointment?.isManual
+                        ? styles.slotRowManual
+                        : styles.slotRowBooked),
                     slot.isBooked && isPast && styles.slotRowPastBooked,
                     !slot.isBooked && !slot.isAvailable && styles.slotRowClosed,
                     !slot.isBooked && isPast && styles.slotRowPast,
                   ]}
                 >
+                  <View
+                    style={[
+                      styles.slotRail,
+                      !slot.isBooked &&
+                        slot.isAvailable &&
+                        !isPast &&
+                        styles.slotRailOpen,
+                      slot.isBooked &&
+                        !isPast &&
+                        (slot.appointment?.isManual
+                          ? styles.slotRailManual
+                          : styles.slotRailBooked),
+                      ((!slot.isBooked && !slot.isAvailable) || isPast) &&
+                        styles.slotRailMuted,
+                    ]}
+                  />
                   {/* Time */}
                   <View style={styles.slotTimeCol}>
-                    <Text style={[
-                      styles.slotTime,
-                      slot.isBooked && !isPast && styles.slotTimeBooked,
-                      isPast && styles.slotTimePast,
-                    ]}>
+                    <Text
+                      style={[
+                        styles.slotTime,
+                        slot.isBooked && !isPast && styles.slotTimeBooked,
+                        isPast && styles.slotTimePast,
+                      ]}
+                    >
                       {slot.startTime}
                     </Text>
-                    <Text style={[
-                      styles.slotEndTime,
-                      slot.isBooked && !isPast && styles.slotTimeBooked,
-                      isPast && styles.slotTimePast,
-                    ]}>
+                    <Text
+                      style={[
+                        styles.slotEndTime,
+                        slot.isBooked && !isPast && styles.slotTimeBooked,
+                        isPast && styles.slotTimePast,
+                      ]}
+                    >
                       {slot.endTime}
                     </Text>
                   </View>
@@ -556,7 +682,13 @@ export default function SlotsScreen() {
                         </Text>
                       </View>
                       {slot.appointment && (
-                        <Text style={[styles.customerName, isPast && { color: c.mutedForeground }]} numberOfLines={1}>
+                        <Text
+                          style={[
+                            styles.customerName,
+                            isPast && { color: c.mutedForeground },
+                          ]}
+                          numberOfLines={1}
+                        >
                           {slot.appointment.customerName}
                         </Text>
                       )}
@@ -577,7 +709,11 @@ export default function SlotsScreen() {
 
                   {/* Booked slot tap hint */}
                   {slot.isBooked && (
-                    <Feather name="chevron-right" size={16} color={isPast ? c.mutedForeground : c.primary} />
+                    <Feather
+                      name="chevron-right"
+                      size={16}
+                      color={isPast ? c.mutedForeground : c.primary}
+                    />
                   )}
 
                   {/* Actions for non-booked slots */}
@@ -592,7 +728,13 @@ export default function SlotsScreen() {
                         <Feather
                           name={slot.isAvailable ? "eye" : "eye-off"}
                           size={18}
-                          color={isPast ? c.border : (slot.isAvailable ? c.primary : c.mutedForeground)}
+                          color={
+                            isPast
+                              ? c.border
+                              : slot.isAvailable
+                                ? c.primary
+                                : c.mutedForeground
+                          }
                         />
                       </TouchableOpacity>
                       <TouchableOpacity
@@ -601,12 +743,16 @@ export default function SlotsScreen() {
                         activeOpacity={0.7}
                         disabled={deleteSlot.isPending || isPast}
                       >
-                        <Feather name="trash-2" size={18} color={isPast ? c.border : c.destructive} />
+                        <Feather
+                          name="trash-2"
+                          size={18}
+                          color={isPast ? c.border : c.destructive}
+                        />
                       </TouchableOpacity>
                     </View>
                   )}
                 </View>
-              </TouchableOpacity>
+              </PressableScale>
             );
           }}
         />
@@ -625,59 +771,74 @@ export default function SlotsScreen() {
             showsVerticalScrollIndicator={false}
             bounces={false}
           >
-          <View style={styles.addModalContent}>
-            <Text style={styles.modalTitle}>Yeni Saat Aralığı Ekle</Text>
-            <Text style={styles.modalDate}>{selectedDate}</Text>
-
-            <View style={styles.timeRow}>
-              <View style={{ flex: 1, gap: 6 }}>
-                <Text style={styles.modalLabel}>Başlangıç</Text>
-                <TextInput
-                  style={styles.timeInput}
-                  value={startTime}
-                  onChangeText={(v) => setStartTime(formatTimeInput(v))}
-                  onBlur={() => setStartTime(normalizeTimeInput(startTime))}
-                  placeholder="09:00"
-                  placeholderTextColor={c.mutedForeground}
-                  keyboardType="number-pad"
-                  maxLength={5}
-                />
+            <View style={styles.addModalContent}>
+              <View style={styles.handleBar} />
+              <View style={styles.modalHero}>
+                <View style={styles.modalIcon}>
+                  <Feather name="clock" size={20} color={c.accent} />
+                </View>
+                <View style={styles.modalTitleBlock}>
+                  <Text style={styles.modalKicker}>Saat aralığı</Text>
+                  <Text style={styles.modalTitle}>Yeni Slot Ekle</Text>
+                </View>
               </View>
-              <View style={{ flex: 1, gap: 6 }}>
-                <Text style={styles.modalLabel}>Bitiş</Text>
-                <TextInput
-                  style={styles.timeInput}
-                  value={endTime}
-                  onChangeText={(v) => setEndTime(formatTimeInput(v))}
-                  onBlur={() => setEndTime(normalizeTimeInput(endTime))}
-                  placeholder="10:00"
-                  placeholderTextColor={c.mutedForeground}
-                  keyboardType="number-pad"
-                  maxLength={5}
-                />
+              <View style={styles.modalDatePill}>
+                <Feather name="calendar" size={14} color={c.primary} />
+                <Text style={styles.modalDate}>{selectedDateDisplay}</Text>
+              </View>
+
+              <View style={styles.timeRow}>
+                <View style={styles.timeFieldCard}>
+                  <Text style={styles.modalLabel}>Başlangıç</Text>
+                  <TextInput
+                    style={styles.timeInput}
+                    value={startTime}
+                    onChangeText={(v) => setStartTime(formatTimeInput(v))}
+                    onBlur={() => setStartTime(normalizeTimeInput(startTime))}
+                    placeholder="09:00"
+                    placeholderTextColor={c.mutedForeground}
+                    keyboardType="number-pad"
+                    maxLength={5}
+                  />
+                </View>
+                <View style={styles.timeFieldCard}>
+                  <Text style={styles.modalLabel}>Bitiş</Text>
+                  <TextInput
+                    style={styles.timeInput}
+                    value={endTime}
+                    onChangeText={(v) => setEndTime(formatTimeInput(v))}
+                    onBlur={() => setEndTime(normalizeTimeInput(endTime))}
+                    placeholder="10:00"
+                    placeholderTextColor={c.mutedForeground}
+                    keyboardType="number-pad"
+                    maxLength={5}
+                  />
+                </View>
+              </View>
+
+              <View style={styles.modalActions}>
+                <PressableScale
+                  style={styles.modalCancel}
+                  onPress={() => setShowAddModal(false)}
+                >
+                  <Text style={styles.modalCancelText}>İptal</Text>
+                </PressableScale>
+                <PressableScale
+                  style={[
+                    styles.modalConfirm,
+                    createSlot.isPending && { opacity: 0.7 },
+                  ]}
+                  onPress={handleCreateSlot}
+                  disabled={createSlot.isPending}
+                >
+                  {createSlot.isPending ? (
+                    <ActivityIndicator color="#fff" size="small" />
+                  ) : (
+                    <Text style={styles.modalConfirmText}>Ekle</Text>
+                  )}
+                </PressableScale>
               </View>
             </View>
-
-            <View style={styles.modalActions}>
-              <TouchableOpacity
-                style={styles.modalCancel}
-                onPress={() => setShowAddModal(false)}
-              >
-                <Text style={styles.modalCancelText}>İptal</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.modalConfirm, createSlot.isPending && { opacity: 0.7 }]}
-                onPress={handleCreateSlot}
-                disabled={createSlot.isPending}
-              >
-                {createSlot.isPending ? (
-                  <ActivityIndicator color="#fff" size="small" />
-                ) : (
-                  <Text style={styles.modalConfirmText}>Ekle</Text>
-                )}
-              </TouchableOpacity>
-            </View>
-          </View>
           </ScrollView>
         </KeyboardAvoidingView>
       </Modal>
@@ -729,11 +890,22 @@ export default function SlotsScreen() {
             onPress={() => setManualSlot(null)}
           />
           <View style={styles.manualModal}>
-            <View style={styles.manualHeader}>
-              <Feather name="user-plus" size={20} color="#7C3AED" />
-              <Text style={styles.manualTitle}>Manuel Randevu</Text>
+            <View style={styles.handleBar} />
+            <View style={styles.modalHero}>
+              <View style={[styles.modalIcon, styles.manualModalIcon]}>
+                <Feather name="user-plus" size={20} color="#7C3AED" />
+              </View>
+              <View style={styles.modalTitleBlock}>
+                <Text style={styles.modalKicker}>Randevu ekle</Text>
+                <Text style={styles.manualTitle}>Manuel Randevu</Text>
+              </View>
             </View>
-            <Text style={styles.manualSubtitle}>{manualSlot?.time ?? ""}</Text>
+            <View style={styles.modalDatePill}>
+              <Feather name="clock" size={14} color={c.primary} />
+              <Text style={styles.manualSubtitle}>
+                {manualSlot?.time ?? ""}
+              </Text>
+            </View>
             <Text style={styles.manualLabel}>Müşteri Adı</Text>
             <TextInput
               style={styles.manualInput}
@@ -745,14 +917,13 @@ export default function SlotsScreen() {
               returnKeyType="done"
             />
             <View style={styles.manualActions}>
-              <TouchableOpacity
+              <PressableScale
                 style={styles.modalCancel}
                 onPress={() => setManualSlot(null)}
-                activeOpacity={0.8}
               >
                 <Text style={styles.modalCancelText}>İptal</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
+              </PressableScale>
+              <PressableScale
                 style={styles.manualConfirm}
                 onPress={() => {
                   const name = manualName.trim();
@@ -762,10 +933,12 @@ export default function SlotsScreen() {
                   }
                   if (!manualSlot) return;
                   createManualAppt.mutate({
-                    data: { slotId: manualSlot.slotId, manualCustomerName: name },
+                    data: {
+                      slotId: manualSlot.slotId,
+                      manualCustomerName: name,
+                    },
                   });
                 }}
-                activeOpacity={0.8}
                 disabled={createManualAppt.isPending}
               >
                 {createManualAppt.isPending ? (
@@ -773,7 +946,7 @@ export default function SlotsScreen() {
                 ) : (
                   <Text style={styles.modalConfirmText}>Ekle</Text>
                 )}
-              </TouchableOpacity>
+              </PressableScale>
             </View>
           </View>
         </KeyboardAvoidingView>
@@ -789,72 +962,146 @@ const styles = StyleSheet.create({
   titleRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "center",
+    alignItems: "flex-start",
     paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingTop: 18,
+    paddingBottom: 14,
+    gap: 12,
   },
-  title: { fontSize: 22, fontFamily: "Inter_700Bold", color: c.foreground },
+  titleBlock: { flex: 1, minWidth: 0 },
+  title: { fontSize: 24, fontFamily: "Inter_700Bold", color: c.foreground },
+  titleMeta: {
+    fontSize: 13,
+    fontFamily: "Inter_500Medium",
+    color: c.mutedForeground,
+    marginTop: 3,
+    textTransform: "capitalize",
+  },
   addBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
     backgroundColor: c.primary,
     borderRadius: 20,
-    width: 38,
-    height: 38,
+    height: 40,
+    paddingHorizontal: 14,
     justifyContent: "center",
-    alignItems: "center",
+    shadowColor: c.primary,
+    shadowOpacity: 0.18,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 3,
+  },
+  addBtnText: {
+    fontSize: 13,
+    fontFamily: "Inter_700Bold",
+    color: "#fff",
   },
   daysScrollWrapper: { height: 108, flexShrink: 0, overflow: "hidden" },
   daysRow: { paddingHorizontal: 16, paddingBottom: 16, gap: 8 },
   dayBtn: {
     alignItems: "center",
-    justifyContent: "flex-start",
+    justifyContent: "center",
     height: 92,
-    paddingHorizontal: 12,
-    paddingTop: 8,
-    paddingBottom: 8,
+    paddingHorizontal: 13,
+    paddingVertical: 8,
     borderRadius: colors.radius,
-    backgroundColor: c.background,
+    backgroundColor: c.card,
     minWidth: 72,
     borderWidth: 1,
     borderColor: c.border,
     shadowColor: "#000",
     shadowOpacity: 0.03,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 },
     elevation: 1,
   },
   dayBtnActive: { backgroundColor: c.primary, borderColor: c.primary },
-  dayName: { fontSize: 10, fontFamily: "Inter_500Medium", color: c.mutedForeground },
+  dayName: {
+    fontSize: 10,
+    fontFamily: "Inter_500Medium",
+    color: c.mutedForeground,
+  },
   dayNameActive: { color: "rgba(255,255,255,0.78)" },
-  dayDate: { fontSize: 12, fontFamily: "Inter_700Bold", color: c.foreground, marginTop: 0 },
+  dayDate: {
+    fontSize: 24,
+    fontFamily: "Inter_700Bold",
+    color: c.foreground,
+    marginTop: 3,
+  },
   dayDateActive: { color: "#fff" },
+  dayMonth: {
+    fontSize: 10,
+    fontFamily: "Inter_600SemiBold",
+    color: c.mutedForeground,
+    marginTop: 2,
+    textTransform: "uppercase",
+  },
+  dayMonthActive: { color: "rgba(255,255,255,0.78)" },
   slotList: { paddingHorizontal: 16, paddingTop: 4, gap: 8 },
 
   slotRow: {
     flexDirection: "row",
     alignItems: "center",
-    minHeight: 56,
+    minHeight: 68,
     backgroundColor: c.card,
     borderRadius: colors.radius,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderWidth: 1.5,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderWidth: 1,
     borderColor: c.border,
     gap: 12,
+    shadowColor: "#000",
+    shadowOpacity: 0.04,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 2,
   },
-  slotRowBooked: { backgroundColor: c.primary + "18", borderColor: c.primary + "60" },
-  slotRowManual: { backgroundColor: "#EDE9FE", borderColor: "#7C3AED" + "60" },
-  slotRowClosed: { backgroundColor: c.secondary, opacity: 0.75 },
-  slotRowPast: { backgroundColor: "#F9FAFB", borderColor: "#E5E7EB", opacity: 0.75 },
+  slotRowBooked: {
+    backgroundColor: c.primary + "10",
+    borderColor: c.primary + "30",
+  },
+  slotRowManual: { backgroundColor: "#F5F3FF", borderColor: "#7C3AED" + "30" },
+  slotRowClosed: { backgroundColor: c.secondary, opacity: 0.82 },
+  slotRowPast: {
+    backgroundColor: "#F9FAFB",
+    borderColor: "#E5E7EB",
+    opacity: 0.75,
+  },
   slotRowPastBooked: { backgroundColor: "#F3F4F6", borderColor: "#E5E7EB" },
 
-  slotTimeCol: { width: 56, flexShrink: 0 },
+  slotRail: {
+    width: 4,
+    height: 44,
+    borderRadius: 999,
+    backgroundColor: c.border,
+    flexShrink: 0,
+  },
+  slotRailOpen: { backgroundColor: "#10B981" },
+  slotRailBooked: { backgroundColor: c.primary },
+  slotRailManual: { backgroundColor: "#7C3AED" },
+  slotRailMuted: { backgroundColor: "#CBD5E1" },
+
+  slotTimeCol: { width: 62, flexShrink: 0 },
   slotTime: { fontSize: 15, fontFamily: "Inter_700Bold", color: c.foreground },
-  slotEndTime: { fontSize: 12, fontFamily: "Inter_400Regular", color: c.mutedForeground, marginTop: 1 },
+  slotEndTime: {
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
+    color: c.mutedForeground,
+    marginTop: 1,
+  },
   slotTimeBooked: { color: c.primary },
   slotTimeClosed: { color: c.mutedForeground },
   slotTimePast: { color: "#9CA3AF" },
 
-  bookedInfo: { flex: 1, minWidth: 0, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 },
+  bookedInfo: {
+    flex: 1,
+    minWidth: 0,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8,
+  },
   customerName: {
     flex: 1,
     fontSize: 13,
@@ -866,51 +1113,71 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 0,
     backgroundColor: "#D1FAE5",
-    borderRadius: 6,
-    paddingVertical: 4,
-    paddingHorizontal: 10,
+    borderRadius: 999,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
     alignSelf: "center",
     marginRight: 8,
   },
-  badgeOpenText: { fontSize: 12, fontFamily: "Inter_600SemiBold", color: "#059669" },
+  badgeOpenText: {
+    fontSize: 12,
+    fontFamily: "Inter_600SemiBold",
+    color: "#059669",
+  },
   badgeBooked: {
     backgroundColor: c.primary + "20",
-    borderRadius: 6,
-    paddingVertical: 4,
-    paddingHorizontal: 10,
+    borderRadius: 999,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
     alignSelf: "center",
     marginRight: 8,
   },
-  badgeBookedText: { fontSize: 12, fontFamily: "Inter_600SemiBold", color: c.primary },
+  badgeBookedText: {
+    fontSize: 12,
+    fontFamily: "Inter_600SemiBold",
+    color: c.primary,
+  },
   badgeManual: {
     backgroundColor: "#EDE9FE",
-    borderRadius: 6,
-    paddingVertical: 4,
-    paddingHorizontal: 10,
+    borderRadius: 999,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
     alignSelf: "center",
     marginRight: 8,
   },
-  badgeManualText: { fontSize: 12, fontFamily: "Inter_600SemiBold", color: "#7C3AED" },
+  badgeManualText: {
+    fontSize: 12,
+    fontFamily: "Inter_600SemiBold",
+    color: "#7C3AED",
+  },
   badgePast: {
     backgroundColor: "#F3F4F6",
-    borderRadius: 6,
-    paddingVertical: 4,
-    paddingHorizontal: 10,
+    borderRadius: 999,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
     alignSelf: "center" as const,
     marginRight: 8,
   },
-  badgePastText: { fontSize: 12, fontFamily: "Inter_600SemiBold", color: "#9CA3AF" },
+  badgePastText: {
+    fontSize: 12,
+    fontFamily: "Inter_600SemiBold",
+    color: "#9CA3AF",
+  },
   badgeClosed: {
     flex: 1,
     minWidth: 0,
     backgroundColor: "#FEF3C7",
-    borderRadius: 6,
-    paddingVertical: 4,
-    paddingHorizontal: 10,
+    borderRadius: 999,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
     alignSelf: "center",
     marginRight: 8,
   },
-  badgeClosedText: { fontSize: 12, fontFamily: "Inter_600SemiBold", color: "#92400E" },
+  badgeClosedText: {
+    fontSize: 12,
+    fontFamily: "Inter_600SemiBold",
+    color: "#92400E",
+  },
 
   slotActions: { flexDirection: "row", gap: 4, flexShrink: 0 },
   iconBtn: {
@@ -918,8 +1185,10 @@ const styles = StyleSheet.create({
     height: 36,
     justifyContent: "center",
     alignItems: "center",
-    borderRadius: 8,
-    backgroundColor: c.background,
+    borderRadius: 10,
+    backgroundColor: c.card,
+    borderWidth: 1,
+    borderColor: c.border,
   },
 
   templateBanner: {
@@ -943,7 +1212,11 @@ const styles = StyleSheet.create({
   templateBannerTextClosed: { color: c.mutedForeground },
 
   empty: { alignItems: "center", paddingVertical: 40, gap: 16 },
-  emptyText: { fontSize: 15, fontFamily: "Inter_500Medium", color: c.mutedForeground },
+  emptyText: {
+    fontSize: 15,
+    fontFamily: "Inter_500Medium",
+    color: c.mutedForeground,
+  },
 
   modalOverlay: {
     flex: 1,
@@ -955,17 +1228,84 @@ const styles = StyleSheet.create({
     justifyContent: "flex-end",
   },
   addModalContent: {
-    backgroundColor: c.background,
+    width: "100%",
+    maxWidth: 560,
+    alignSelf: "center",
+    backgroundColor: c.card,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
+    borderWidth: 1,
+    borderColor: c.border,
     padding: 24,
     paddingBottom: Platform.OS === "ios" ? 32 : 24,
     gap: 16,
+    shadowColor: "#000",
+    shadowOpacity: 0.12,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 10 },
+    elevation: 8,
   },
-  modalTitle: { fontSize: 20, fontFamily: "Inter_700Bold", color: c.foreground },
-  modalDate: { fontSize: 14, fontFamily: "Inter_400Regular", color: c.mutedForeground },
-  modalLabel: { fontSize: 13, fontFamily: "Inter_500Medium", color: c.mutedForeground },
+  modalHero: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  modalIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: c.primary + "12",
+    borderWidth: 1,
+    borderColor: c.border,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  manualModalIcon: { backgroundColor: "#7C3AED14" },
+  modalTitleBlock: { flex: 1, minWidth: 0 },
+  modalKicker: {
+    fontSize: 11,
+    fontFamily: "Inter_700Bold",
+    color: c.accent,
+    marginBottom: 2,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontFamily: "Inter_700Bold",
+    color: c.foreground,
+  },
+  modalDatePill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    alignSelf: "flex-start",
+    borderRadius: 999,
+    backgroundColor: c.secondary,
+    borderWidth: 1,
+    borderColor: c.border,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  modalDate: {
+    fontSize: 14,
+    fontFamily: "Inter_700Bold",
+    color: c.primary,
+    textTransform: "capitalize",
+  },
+  modalLabel: {
+    fontSize: 13,
+    fontFamily: "Inter_500Medium",
+    color: c.mutedForeground,
+  },
   timeRow: { flexDirection: "row", gap: 12 },
+  timeFieldCard: {
+    flex: 1,
+    gap: 7,
+    borderRadius: colors.radius,
+    backgroundColor: c.background,
+    borderWidth: 1,
+    borderColor: c.border,
+    padding: 12,
+  },
   timeInput: {
     backgroundColor: c.card,
     borderRadius: colors.radius,
@@ -985,32 +1325,70 @@ const styles = StyleSheet.create({
     borderRadius: colors.radius,
     paddingVertical: 14,
     alignItems: "center",
+    borderWidth: 1,
+    borderColor: c.border,
   },
-  modalCancelText: { fontSize: 15, fontFamily: "Inter_600SemiBold", color: c.foreground },
+  modalCancelText: {
+    fontSize: 15,
+    fontFamily: "Inter_600SemiBold",
+    color: c.foreground,
+  },
   modalConfirm: {
     flex: 1,
     backgroundColor: c.primary,
     borderRadius: colors.radius,
     paddingVertical: 14,
     alignItems: "center",
+    shadowColor: c.primary,
+    shadowOpacity: 0.14,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 5 },
+    elevation: 3,
   },
-  modalConfirmText: { fontSize: 15, fontFamily: "Inter_600SemiBold", color: "#fff" },
+  modalConfirmText: {
+    fontSize: 15,
+    fontFamily: "Inter_600SemiBold",
+    color: "#fff",
+  },
 
   modalBackdrop: { ...StyleSheet.absoluteFillObject },
   manualModal: {
-    backgroundColor: c.background,
+    width: "100%",
+    maxWidth: 560,
+    alignSelf: "center",
+    backgroundColor: c.card,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
+    borderWidth: 1,
+    borderColor: c.border,
     padding: 24,
     paddingBottom: Platform.OS === "ios" ? 32 : 24,
-    gap: 12,
+    gap: 14,
+    shadowColor: "#000",
+    shadowOpacity: 0.12,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 10 },
+    elevation: 8,
   },
   manualHeader: { flexDirection: "row", alignItems: "center", gap: 8 },
-  manualTitle: { fontSize: 18, fontFamily: "Inter_700Bold", color: c.foreground },
-  manualSubtitle: { fontSize: 14, fontFamily: "Inter_500Medium", color: c.mutedForeground, marginTop: -4 },
-  manualLabel: { fontSize: 13, fontFamily: "Inter_500Medium", color: c.mutedForeground, marginTop: 8 },
+  manualTitle: {
+    fontSize: 18,
+    fontFamily: "Inter_700Bold",
+    color: c.foreground,
+  },
+  manualSubtitle: {
+    fontSize: 14,
+    fontFamily: "Inter_700Bold",
+    color: c.primary,
+  },
+  manualLabel: {
+    fontSize: 13,
+    fontFamily: "Inter_500Medium",
+    color: c.mutedForeground,
+    marginTop: 8,
+  },
   manualInput: {
-    backgroundColor: c.card,
+    backgroundColor: c.background,
     borderRadius: colors.radius,
     paddingHorizontal: 16,
     paddingVertical: 12,

@@ -19,6 +19,8 @@ export interface AuthUser {
   id: number;
   email: string;
   name: string;
+  firstName?: string | null;
+  lastName?: string | null;
   phone: string | null;
   role: "barber" | "customer";
   createdAt: string;
@@ -76,6 +78,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Clear React state FIRST so UI re-renders immediately
     setToken(null);
     setUser(null);
+    setAuthTokenGetter(null);
     // Then clear storage (fire and forget is fine, state is already null)
     try {
       await AsyncStorage.multiRemove([TOKEN_KEY, USER_KEY]);

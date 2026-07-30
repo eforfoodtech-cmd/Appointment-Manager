@@ -38,17 +38,27 @@ import { formatTimeInput, normalizeTimeInput } from "@/utils/timeInput";
 
 const c = colors.light;
 
-const DAY_NAMES = ["Pazar", "Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi"];
+const DAY_NAMES = [
+  "Pazar",
+  "Pazartesi",
+  "Salı",
+  "Çarşamba",
+  "Perşembe",
+  "Cuma",
+  "Cumartesi",
+];
 const DAY_SHORT = ["Paz", "Pzt", "Sal", "Çar", "Per", "Cum", "Cmt"];
 const DURATION_OPTIONS = [30, 45, 60, 90];
 
-const DEFAULT_TEMPLATE: AvailabilityInput[] = [0, 1, 2, 3, 4, 5, 6].map((d) => ({
-  dayOfWeek: d,
-  startTime: "10:00",
-  endTime: "23:00",
-  isOpen: d >= 1 && d <= 6, // Mon–Sat open, Sun closed
-  slotDuration: 60,
-}));
+const DEFAULT_TEMPLATE: AvailabilityInput[] = [0, 1, 2, 3, 4, 5, 6].map(
+  (d) => ({
+    dayOfWeek: d,
+    startTime: "10:00",
+    endTime: "23:00",
+    isOpen: d >= 1 && d <= 6, // Mon–Sat open, Sun closed
+    slotDuration: 60,
+  }),
+);
 
 /**
  * Validates an HH:MM time string.
@@ -108,6 +118,7 @@ export default function BarberProfile() {
 
   const [shopName, setShopName] = useState("");
   const [shopAddress, setShopAddress] = useState("");
+  const [phone, setPhone] = useState("");
   const [bio, setBio] = useState("");
 
   // Weekly schedule state — 7 rows, one per day
@@ -119,6 +130,7 @@ export default function BarberProfile() {
     if (profile) {
       setShopName(profile.shopName);
       setShopAddress(profile.shopAddress || "");
+      setPhone(profile.phone || "");
       setBio(profile.bio || "");
     }
   }, [profile]);
@@ -148,17 +160,22 @@ export default function BarberProfile() {
   const updateProfile = useUpdateMyBarberProfile({
     mutation: {
       onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: getGetMyBarberProfileQueryKey() });
+        queryClient.invalidateQueries({
+          queryKey: getGetMyBarberProfileQueryKey(),
+        });
         setEditMode(false);
       },
-      onError: (err: any) => Alert.alert("Hata", err?.data?.error || "Güncellenemedi"),
+      onError: (err: any) =>
+        Alert.alert("Hata", err?.data?.error || "Güncellenemedi"),
     },
   });
 
   const setAvailability = useSetMyAvailability({
     mutation: {
       onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: getGetMyAvailabilityQueryKey() });
+        queryClient.invalidateQueries({
+          queryKey: getGetMyAvailabilityQueryKey(),
+        });
         setScheduleEditing(false);
         seedWeek.mutate(undefined, {
           onSuccess: () =>
@@ -199,9 +216,18 @@ export default function BarberProfile() {
       data: {
         shopName: shopName.trim(),
         shopAddress: shopAddress.trim() || undefined,
+        phone: phone.trim() || undefined,
         bio: bio.trim() || undefined,
       },
     });
+  };
+
+  const handleCancelEdit = () => {
+    setShopName(profile?.shopName || "");
+    setShopAddress(profile?.shopAddress || "");
+    setPhone(profile?.phone || "");
+    setBio(profile?.bio || "");
+    setEditMode(false);
   };
 
   const handleSaveSchedule = () => {
@@ -223,15 +249,55 @@ export default function BarberProfile() {
 
   const updateDay = (dayOfWeek: number, patch: Partial<DayRow>) => {
     setSchedule((prev) =>
-      prev.map((row) => (row.dayOfWeek === dayOfWeek ? { ...row, ...patch } : row)),
+      prev.map((row) =>
+        row.dayOfWeek === dayOfWeek ? { ...row, ...patch } : row,
+      ),
     );
+  };
+
+  const completeLogout = async () => {
+    await logout();
+    if (Platform.OS === "web") {
+      (window as Window & typeof globalThis).location.href = "/login";
+    } else {
+      router.replace("/login");
+    }
+  };
+
+  const handleLogout = () => {
+    if (Platform.OS === "web") {
+      if (
+        (window as Window & typeof globalThis).confirm(
+          "Hesabinizdan cikmak istiyor musunuz?",
+        )
+      ) {
+        void completeLogout();
+      }
+      return;
+    }
+
+    Alert.alert("Cikis", "Hesabinizdan cikmak istiyor musunuz?", [
+      { text: "Iptal", style: "cancel" },
+      {
+        text: "Cikis Yap",
+        style: "destructive",
+        onPress: () => {
+          void completeLogout();
+        },
+      },
+    ]);
   };
 
   const paddingTop = insets.top + (Platform.OS === "web" ? 67 : 0);
 
   if (isLoading) {
     return (
-      <View style={[styles.container, { paddingTop, justifyContent: "center", alignItems: "center" }]}>
+      <View
+        style={[
+          styles.container,
+          { paddingTop, justifyContent: "center", alignItems: "center" },
+        ]}
+      >
         <ActivityIndicator color={c.primary} />
       </View>
     );
@@ -239,182 +305,262 @@ export default function BarberProfile() {
 
   return (
     <View style={styles.container}>
-    <ScrollView
-      style={styles.scroll}
-      contentContainerStyle={{ paddingTop, paddingBottom: insets.bottom + 100 }}
-    >
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.title}>Profilim</Text>
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={{
+          paddingTop,
+          paddingBottom: insets.bottom + 100,
+        }}
+      >
+        {/* Header */}
+        <View style={styles.header}>
+          <View style={styles.headerTitleBlock}>
+            <Text style={styles.headerEyebrow}>Berber profili</Text>
+            <Text style={styles.title}>Profilim</Text>
+          </View>
+          <View style={styles.headerActions}>
+            {editMode && !updateProfile.isPending && (
+              <TouchableOpacity
+                style={styles.cancelEditBtn}
+                onPress={handleCancelEdit}
+                activeOpacity={0.8}
+              >
+                <Feather name="x" size={16} color={c.mutedForeground} />
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity
+              style={[styles.editBtn, editMode && styles.editBtnActive]}
+              onPress={() => (editMode ? handleSave() : setEditMode(true))}
+              activeOpacity={0.8}
+              disabled={updateProfile.isPending}
+            >
+              {updateProfile.isPending ? (
+                <ActivityIndicator color="#fff" size="small" />
+              ) : (
+                <>
+                  <Feather
+                    name={editMode ? "check" : "edit-2"}
+                    size={16}
+                    color={editMode ? "#fff" : c.primary}
+                  />
+                  <Text
+                    style={[
+                      styles.editBtnText,
+                      editMode && styles.editBtnTextActive,
+                    ]}
+                  >
+                    {editMode ? "Kaydet" : "Düzenle"}
+                  </Text>
+                </>
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Profile card */}
+        <View style={styles.card}>
+          <View style={styles.profileTopRow}>
+            <View style={styles.avatar}>
+              <Text style={styles.avatarText}>
+                {user?.name?.charAt(0).toUpperCase()}
+              </Text>
+            </View>
+            <View style={styles.profileTextBlock}>
+              <Text style={styles.name}>{user?.name}</Text>
+              <Text style={styles.email}>{user?.email}</Text>
+            </View>
+          </View>
+          <View style={styles.profileMetaRow}>
+            <View style={styles.rolePill}>
+              <Feather name="scissors" size={13} color={c.accent} />
+              <Text style={styles.rolePillText}>Berber</Text>
+            </View>
+            {profile?.phone && (
+              <View style={styles.rolePill}>
+                <Feather name="phone" size={13} color={c.accent} />
+                <Text style={styles.rolePillText}>{profile.phone}</Text>
+              </View>
+            )}
+          </View>
+        </View>
+
+        {/* Shop info */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeaderCompact}>
+            <View>
+              <Text style={styles.sectionKicker}>Kişisel ve işletme</Text>
+              <Text style={[styles.sectionTitle, styles.sectionTitleTight]}>
+                Profil Bilgileri
+              </Text>
+            </View>
+            {editMode && <Text style={styles.editingPill}>Düzenleniyor</Text>}
+          </View>
+
+          <InfoRow
+            label="İşletme Adı"
+            value={shopName}
+            onChange={setShopName}
+            editable={editMode}
+          />
+          <InfoRow
+            label="Adres"
+            value={shopAddress}
+            onChange={setShopAddress}
+            editable={editMode}
+            placeholder="İlçe, Şehir"
+          />
+          <InfoRow
+            label="Telefon"
+            value={phone}
+            onChange={setPhone}
+            editable={editMode}
+            placeholder="0555 000 00 00"
+            keyboardType="phone-pad"
+          />
+          <InfoRow
+            label="Biyografi"
+            value={bio}
+            onChange={setBio}
+            editable={editMode}
+            placeholder="Kendinizden bahsedin..."
+            multiline
+          />
+        </View>
+
+        {/* Weekly Schedule Template */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Haftalık Program</Text>
+            <TouchableOpacity
+              style={[
+                styles.scheduleEditBtn,
+                scheduleEditing && styles.scheduleEditBtnActive,
+              ]}
+              onPress={() =>
+                scheduleEditing
+                  ? handleSaveSchedule()
+                  : setScheduleEditing(true)
+              }
+              activeOpacity={0.8}
+            >
+              {setAvailability.isPending ? (
+                <ActivityIndicator
+                  color={scheduleEditing ? "#fff" : c.primary}
+                  size="small"
+                />
+              ) : (
+                <Text
+                  style={[
+                    styles.scheduleEditBtnText,
+                    scheduleEditing && styles.scheduleEditBtnTextActive,
+                  ]}
+                >
+                  {scheduleEditing ? "Kaydet" : "Düzenle"}
+                </Text>
+              )}
+            </TouchableOpacity>
+          </View>
+
+          <Text style={styles.scheduleHint}>
+            Bu program haftalık otomatik takvim oluşturmak için kullanılır.
+          </Text>
+
+          {schedule.map((row) => (
+            <DayScheduleRow
+              key={row.dayOfWeek}
+              row={row}
+              editing={scheduleEditing}
+              onUpdate={(patch) => updateDay(row.dayOfWeek, patch)}
+            />
+          ))}
+
+          {scheduleEditing && (
+            <TouchableOpacity
+              style={styles.cancelScheduleBtn}
+              onPress={() => {
+                setScheduleEditing(false);
+                // Revert to server data
+                if (availabilityData && availabilityData.length > 0) {
+                  const map = new Map(
+                    availabilityData.map((a) => [a.dayOfWeek, a]),
+                  );
+                  setSchedule(
+                    [0, 1, 2, 3, 4, 5, 6].map((d) => {
+                      const r = map.get(d);
+                      return r
+                        ? {
+                            dayOfWeek: d,
+                            isOpen: r.isOpen,
+                            startTime: r.startTime,
+                            endTime: r.endTime,
+                            slotDuration: r.slotDuration,
+                          }
+                        : { ...DEFAULT_TEMPLATE[d]! };
+                    }),
+                  );
+                }
+              }}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.cancelScheduleBtnText}>İptal</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {/* No-show blocks */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Engellenen Müşteriler</Text>
+          {!blocks?.length ? (
+            <Text style={styles.noBlocks}>Engellenmiş müşteri yok</Text>
+          ) : (
+            blocks.map((block) => (
+              <View key={block.id} style={styles.blockRow}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.blockName}>{block.customerName}</Text>
+                  {block.reason && (
+                    <Text style={styles.blockReason}>{block.reason}</Text>
+                  )}
+                  {block.expiresAt && (
+                    <Text style={styles.blockExpiry}>
+                      Bitiş:{" "}
+                      {new Date(block.expiresAt).toLocaleDateString("tr-TR")}
+                    </Text>
+                  )}
+                </View>
+                <TouchableOpacity
+                  onPress={() => {
+                    Alert.alert(
+                      "Engeli Kaldır",
+                      "Bu müşterinin engelini kaldırmak ister misiniz?",
+                      [
+                        { text: "İptal", style: "cancel" },
+                        {
+                          text: "Kaldır",
+                          style: "destructive",
+                          onPress: () => handleRemoveBlock(block.id),
+                        },
+                      ],
+                    );
+                  }}
+                >
+                  <Feather name="x-circle" size={22} color={c.destructive} />
+                </TouchableOpacity>
+              </View>
+            ))
+          )}
+        </View>
+
+        {/* Logout */}
         <TouchableOpacity
-          style={styles.editBtn}
-          onPress={() => (editMode ? handleSave() : setEditMode(true))}
+          style={styles.logoutBtn}
+          onPress={handleLogout}
           activeOpacity={0.8}
         >
-          {updateProfile.isPending ? (
-            <ActivityIndicator color="#fff" size="small" />
-          ) : (
-            <Feather name={editMode ? "check" : "edit-2"} size={18} color="#fff" />
-          )}
+          <Feather name="log-out" size={18} color={c.destructive} />
+          <Text style={styles.logoutText}>Çıkış Yap</Text>
         </TouchableOpacity>
-      </View>
-
-      {/* Profile card */}
-      <View style={styles.card}>
-        <View style={styles.avatar}>
-          <Text style={styles.avatarText}>{user?.name?.charAt(0).toUpperCase()}</Text>
-        </View>
-        <Text style={styles.name}>{user?.name}</Text>
-        <Text style={styles.email}>{user?.email}</Text>
-      </View>
-
-      {/* Shop info */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>İşletme Bilgileri</Text>
-
-        <InfoRow
-          label="İşletme Adı"
-          value={shopName}
-          onChange={setShopName}
-          editable={editMode}
-        />
-        <InfoRow
-          label="Adres"
-          value={shopAddress}
-          onChange={setShopAddress}
-          editable={editMode}
-          placeholder="İlçe, Şehir"
-        />
-        <InfoRow
-          label="Biyografi"
-          value={bio}
-          onChange={setBio}
-          editable={editMode}
-          placeholder="Kendinizden bahsedin..."
-          multiline
-        />
-      </View>
-
-      {/* Weekly Schedule Template */}
-      <View style={styles.section}>
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Haftalık Program</Text>
-          <TouchableOpacity
-            style={[styles.scheduleEditBtn, scheduleEditing && styles.scheduleEditBtnActive]}
-            onPress={() => (scheduleEditing ? handleSaveSchedule() : setScheduleEditing(true))}
-            activeOpacity={0.8}
-          >
-            {setAvailability.isPending ? (
-              <ActivityIndicator color={scheduleEditing ? "#fff" : c.primary} size="small" />
-            ) : (
-              <Text style={[styles.scheduleEditBtnText, scheduleEditing && styles.scheduleEditBtnTextActive]}>
-                {scheduleEditing ? "Kaydet" : "Düzenle"}
-              </Text>
-            )}
-          </TouchableOpacity>
-        </View>
-
-        <Text style={styles.scheduleHint}>
-          Bu program haftalık otomatik takvim oluşturmak için kullanılır.
-        </Text>
-
-        {schedule.map((row) => (
-          <DayScheduleRow
-            key={row.dayOfWeek}
-            row={row}
-            editing={scheduleEditing}
-            onUpdate={(patch) => updateDay(row.dayOfWeek, patch)}
-          />
-        ))}
-
-        {scheduleEditing && (
-          <TouchableOpacity
-            style={styles.cancelScheduleBtn}
-            onPress={() => {
-              setScheduleEditing(false);
-              // Revert to server data
-              if (availabilityData && availabilityData.length > 0) {
-                const map = new Map(availabilityData.map((a) => [a.dayOfWeek, a]));
-                setSchedule(
-                  [0, 1, 2, 3, 4, 5, 6].map((d) => {
-                    const r = map.get(d);
-                    return r ? { dayOfWeek: d, isOpen: r.isOpen, startTime: r.startTime, endTime: r.endTime, slotDuration: r.slotDuration } : { ...DEFAULT_TEMPLATE[d]! };
-                  }),
-                );
-              }
-            }}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.cancelScheduleBtnText}>İptal</Text>
-          </TouchableOpacity>
-        )}
-      </View>
-
-      {/* No-show blocks */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Engellenen Müşteriler</Text>
-        {!blocks?.length ? (
-          <Text style={styles.noBlocks}>Engellenmiş müşteri yok</Text>
-        ) : (
-          blocks.map((block) => (
-            <View key={block.id} style={styles.blockRow}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.blockName}>{block.customerName}</Text>
-                {block.reason && (
-                  <Text style={styles.blockReason}>{block.reason}</Text>
-                )}
-                {block.expiresAt && (
-                  <Text style={styles.blockExpiry}>
-                    Bitiş: {new Date(block.expiresAt).toLocaleDateString("tr-TR")}
-                  </Text>
-                )}
-              </View>
-              <TouchableOpacity
-                onPress={() => {
-                  Alert.alert("Engeli Kaldır", "Bu müşterinin engelini kaldırmak ister misiniz?", [
-                    { text: "İptal", style: "cancel" },
-                    {
-                      text: "Kaldır",
-                      style: "destructive",
-                      onPress: () => handleRemoveBlock(block.id),
-                    },
-                  ]);
-                }}
-              >
-                <Feather name="x-circle" size={22} color={c.destructive} />
-              </TouchableOpacity>
-            </View>
-          ))
-        )}
-      </View>
-
-      {/* Logout */}
-      <TouchableOpacity
-        style={styles.logoutBtn}
-        onPress={() => {
-          Alert.alert("Çıkış", "Hesabınızdan çıkmak istiyor musunuz?", [
-            { text: "İptal", style: "cancel" },
-            {
-              text: "Çıkış Yap",
-              style: "destructive",
-              onPress: async () => {
-                await logout();
-                if (Platform.OS === "web") {
-                  (window as Window & typeof globalThis).location.href = "/";
-                } else {
-                  router.replace("/");
-                }
-              },
-            },
-          ]);
-        }}
-        activeOpacity={0.8}
-      >
-        <Feather name="log-out" size={18} color={c.destructive} />
-        <Text style={styles.logoutText}>Çıkış Yap</Text>
-      </TouchableOpacity>
-    </ScrollView>
-    {ToastComponent}
+      </ScrollView>
+      {ToastComponent}
     </View>
   );
 }
@@ -442,8 +588,20 @@ function DayScheduleRow({
             thumbColor={row.isOpen ? c.primary : c.mutedForeground}
           />
         ) : (
-          <View style={[styles.dayStatusBadge, row.isOpen ? styles.dayStatusOpen : styles.dayStatusClosed]}>
-            <Text style={[styles.dayStatusText, row.isOpen ? styles.dayStatusOpenText : styles.dayStatusClosedText]}>
+          <View
+            style={[
+              styles.dayStatusBadge,
+              row.isOpen ? styles.dayStatusOpen : styles.dayStatusClosed,
+            ]}
+          >
+            <Text
+              style={[
+                styles.dayStatusText,
+                row.isOpen
+                  ? styles.dayStatusOpenText
+                  : styles.dayStatusClosedText,
+              ]}
+            >
               {row.isOpen ? "Açık" : "Kapalı"}
             </Text>
           </View>
@@ -460,8 +618,12 @@ function DayScheduleRow({
                   <TextInput
                     style={styles.timeFieldInput}
                     value={row.startTime}
-                    onChangeText={(v) => onUpdate({ startTime: formatTimeInput(v) })}
-                    onBlur={() => onUpdate({ startTime: normalizeTimeInput(row.startTime) })}
+                    onChangeText={(v) =>
+                      onUpdate({ startTime: formatTimeInput(v) })
+                    }
+                    onBlur={() =>
+                      onUpdate({ startTime: normalizeTimeInput(row.startTime) })
+                    }
                     placeholder="09:00"
                     placeholderTextColor={c.mutedForeground}
                     keyboardType="number-pad"
@@ -473,8 +635,12 @@ function DayScheduleRow({
                   <TextInput
                     style={styles.timeFieldInput}
                     value={row.endTime}
-                    onChangeText={(v) => onUpdate({ endTime: formatTimeInput(v) })}
-                    onBlur={() => onUpdate({ endTime: normalizeTimeInput(row.endTime) })}
+                    onChangeText={(v) =>
+                      onUpdate({ endTime: formatTimeInput(v) })
+                    }
+                    onBlur={() =>
+                      onUpdate({ endTime: normalizeTimeInput(row.endTime) })
+                    }
                     placeholder="22:00"
                     placeholderTextColor={c.mutedForeground}
                     keyboardType="number-pad"
@@ -488,11 +654,20 @@ function DayScheduleRow({
                   {DURATION_OPTIONS.map((d) => (
                     <TouchableOpacity
                       key={d}
-                      style={[styles.durationBtn, row.slotDuration === d && styles.durationBtnActive]}
+                      style={[
+                        styles.durationBtn,
+                        row.slotDuration === d && styles.durationBtnActive,
+                      ]}
                       onPress={() => onUpdate({ slotDuration: d })}
                       activeOpacity={0.7}
                     >
-                      <Text style={[styles.durationBtnText, row.slotDuration === d && styles.durationBtnTextActive]}>
+                      <Text
+                        style={[
+                          styles.durationBtnText,
+                          row.slotDuration === d &&
+                            styles.durationBtnTextActive,
+                        ]}
+                      >
                         {d}dk
                       </Text>
                     </TouchableOpacity>
@@ -518,6 +693,7 @@ function InfoRow({
   editable,
   placeholder,
   multiline,
+  keyboardType,
 }: {
   label: string;
   value: string;
@@ -525,10 +701,19 @@ function InfoRow({
   editable: boolean;
   placeholder?: string;
   multiline?: boolean;
+  keyboardType?: React.ComponentProps<typeof TextInput>["keyboardType"];
 }) {
   return (
     <View style={{ marginBottom: 12, gap: 4 }}>
-      <Text style={{ fontSize: 12, fontFamily: "Inter_500Medium", color: c.mutedForeground }}>{label}</Text>
+      <Text
+        style={{
+          fontSize: 12,
+          fontFamily: "Inter_500Medium",
+          color: c.mutedForeground,
+        }}
+      >
+        {label}
+      </Text>
       {editable ? (
         <TextInput
           style={{
@@ -548,9 +733,16 @@ function InfoRow({
           placeholder={placeholder}
           placeholderTextColor={c.mutedForeground}
           multiline={multiline}
+          keyboardType={keyboardType}
         />
       ) : (
-        <Text style={{ fontSize: 15, fontFamily: "Inter_400Regular", color: value ? c.foreground : c.mutedForeground }}>
+        <Text
+          style={{
+            fontSize: 15,
+            fontFamily: "Inter_400Regular",
+            color: value ? c.foreground : c.mutedForeground,
+          }}
+        >
           {value || placeholder || "—"}
         </Text>
       )}
@@ -564,31 +756,119 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "center",
+    alignItems: "flex-start",
     paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingTop: 18,
+    paddingBottom: 14,
+    gap: 12,
   },
-  title: { fontSize: 22, fontFamily: "Inter_700Bold", color: c.foreground },
-  editBtn: {
-    backgroundColor: c.primary,
+  headerTitleBlock: { flex: 1, minWidth: 0 },
+  headerEyebrow: {
+    fontSize: 12,
+    fontFamily: "Inter_700Bold",
+    color: c.accent,
+    marginBottom: 3,
+  },
+  title: { fontSize: 24, fontFamily: "Inter_700Bold", color: c.foreground },
+  headerActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  cancelEditBtn: {
+    width: 40,
+    height: 40,
     borderRadius: 20,
-    width: 38,
-    height: 38,
+    backgroundColor: c.card,
+    borderWidth: 1,
+    borderColor: c.border,
     justifyContent: "center",
     alignItems: "center",
   },
-  card: { alignItems: "center", paddingVertical: 24, gap: 8 },
+  editBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+    backgroundColor: c.card,
+    borderWidth: 1,
+    borderColor: c.border,
+    borderRadius: 20,
+    height: 40,
+    paddingHorizontal: 14,
+    justifyContent: "center",
+    shadowColor: c.primary,
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 3,
+  },
+  editBtnActive: {
+    backgroundColor: c.primary,
+    borderColor: c.primary,
+  },
+  editBtnText: {
+    fontSize: 13,
+    fontFamily: "Inter_700Bold",
+    color: c.primary,
+  },
+  editBtnTextActive: { color: "#fff" },
+  card: {
+    marginHorizontal: 20,
+    marginBottom: 20,
+    backgroundColor: c.primary,
+    borderRadius: colors.radius,
+    padding: 18,
+    gap: 14,
+    shadowColor: "#000",
+    shadowOpacity: 0.05,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 3,
+  },
+  profileTopRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+  },
+  profileTextBlock: { flex: 1, minWidth: 0 },
+  profileMetaRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  rolePill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    borderRadius: 999,
+    backgroundColor: "rgba(255,255,255,0.12)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.18)",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  rolePillText: {
+    fontSize: 12,
+    fontFamily: "Inter_700Bold",
+    color: "#fff",
+  },
   avatar: {
     width: 72,
     height: 72,
     borderRadius: 36,
-    backgroundColor: c.primary,
+    backgroundColor: c.secondary,
+    borderWidth: 1,
+    borderColor: c.border,
     justifyContent: "center",
     alignItems: "center",
   },
-  avatarText: { fontSize: 28, fontFamily: "Inter_700Bold", color: "#fff" },
-  name: { fontSize: 20, fontFamily: "Inter_700Bold", color: c.foreground },
-  email: { fontSize: 14, fontFamily: "Inter_400Regular", color: c.mutedForeground },
+  avatarText: { fontSize: 28, fontFamily: "Inter_700Bold", color: c.primary },
+  name: { fontSize: 20, fontFamily: "Inter_700Bold", color: "#fff" },
+  email: {
+    fontSize: 14,
+    fontFamily: "Inter_400Regular",
+    color: "rgba(255,255,255,0.78)",
+  },
   section: {
     marginHorizontal: 20,
     marginBottom: 24,
@@ -597,6 +877,11 @@ const styles = StyleSheet.create({
     padding: 16,
     borderWidth: 1,
     borderColor: c.border,
+    shadowColor: "#000",
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 1,
   },
   sectionHeader: {
     flexDirection: "row",
@@ -604,7 +889,36 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     marginBottom: 4,
   },
-  sectionTitle: { fontSize: 14, fontFamily: "Inter_700Bold", color: c.foreground, marginBottom: 16 },
+  sectionHeaderCompact: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 12,
+    marginBottom: 14,
+  },
+  sectionKicker: {
+    fontSize: 11,
+    fontFamily: "Inter_700Bold",
+    color: c.accent,
+    marginBottom: 3,
+  },
+  sectionTitle: {
+    fontSize: 14,
+    fontFamily: "Inter_700Bold",
+    color: c.foreground,
+    marginBottom: 16,
+  },
+  sectionTitleTight: { marginBottom: 0 },
+  editingPill: {
+    borderRadius: 999,
+    backgroundColor: c.primary + "12",
+    color: c.primary,
+    fontSize: 12,
+    fontFamily: "Inter_700Bold",
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    overflow: "hidden",
+  },
   scheduleHint: {
     fontSize: 12,
     fontFamily: "Inter_400Regular",
@@ -621,7 +935,11 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   scheduleEditBtnActive: { backgroundColor: c.primary },
-  scheduleEditBtnText: { fontSize: 13, fontFamily: "Inter_600SemiBold", color: c.primary },
+  scheduleEditBtnText: {
+    fontSize: 13,
+    fontFamily: "Inter_600SemiBold",
+    color: c.primary,
+  },
   scheduleEditBtnTextActive: { color: "#fff" },
   cancelScheduleBtn: {
     marginTop: 8,
@@ -648,7 +966,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
   },
-  dayName: { fontSize: 15, fontFamily: "Inter_600SemiBold", color: c.foreground },
+  dayName: {
+    fontSize: 15,
+    fontFamily: "Inter_600SemiBold",
+    color: c.foreground,
+  },
   dayNameClosed: { color: c.mutedForeground },
   dayStatusBadge: {
     borderRadius: 6,
@@ -670,7 +992,11 @@ const styles = StyleSheet.create({
   },
   timeFieldRow: { flexDirection: "row", gap: 12 },
   timeField: { flex: 1, gap: 4 },
-  timeFieldLabel: { fontSize: 12, fontFamily: "Inter_500Medium", color: c.mutedForeground },
+  timeFieldLabel: {
+    fontSize: 12,
+    fontFamily: "Inter_500Medium",
+    color: c.mutedForeground,
+  },
   timeFieldInput: {
     backgroundColor: c.secondary,
     borderRadius: 8,
@@ -693,11 +1019,22 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     backgroundColor: c.background,
   },
-  durationBtnActive: { borderColor: c.primary, backgroundColor: c.primary + "15" },
-  durationBtnText: { fontSize: 13, fontFamily: "Inter_500Medium", color: c.foreground },
+  durationBtnActive: {
+    borderColor: c.primary,
+    backgroundColor: c.primary + "15",
+  },
+  durationBtnText: {
+    fontSize: 13,
+    fontFamily: "Inter_500Medium",
+    color: c.foreground,
+  },
   durationBtnTextActive: { color: c.primary, fontFamily: "Inter_700Bold" },
 
-  noBlocks: { fontSize: 14, fontFamily: "Inter_400Regular", color: c.mutedForeground },
+  noBlocks: {
+    fontSize: 14,
+    fontFamily: "Inter_400Regular",
+    color: c.mutedForeground,
+  },
   blockRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -706,9 +1043,21 @@ const styles = StyleSheet.create({
     borderTopColor: c.border,
     gap: 12,
   },
-  blockName: { fontSize: 15, fontFamily: "Inter_600SemiBold", color: c.foreground },
-  blockReason: { fontSize: 12, fontFamily: "Inter_400Regular", color: c.mutedForeground },
-  blockExpiry: { fontSize: 12, fontFamily: "Inter_400Regular", color: c.warning },
+  blockName: {
+    fontSize: 15,
+    fontFamily: "Inter_600SemiBold",
+    color: c.foreground,
+  },
+  blockReason: {
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
+    color: c.mutedForeground,
+  },
+  blockExpiry: {
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
+    color: c.warning,
+  },
   logoutBtn: {
     flexDirection: "row",
     alignItems: "center",
@@ -721,5 +1070,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#FECACA",
   },
-  logoutText: { fontSize: 15, fontFamily: "Inter_600SemiBold", color: c.destructive },
+  logoutText: {
+    fontSize: 15,
+    fontFamily: "Inter_600SemiBold",
+    color: c.destructive,
+  },
 });

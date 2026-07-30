@@ -5,16 +5,7 @@
  * Tıraş - Barber Appointment SaaS API
  * OpenAPI spec version: 0.1.0
  */
-import type { RegisterRequestRole } from "./registerRequestRole";
+import type { BarberRegisterRequest } from "./barberRegisterRequest";
+import type { CustomerRegisterRequest } from "./customerRegisterRequest";
 
-export interface RegisterRequest {
-  email: string;
-  /** @minLength 6 */
-  password: string;
-  name: string;
-  phone?: string;
-  role: RegisterRequestRole;
-  /** Required if role is barber */
-  shopName?: string;
-  shopAddress?: string;
-}
+export type RegisterRequest = CustomerRegisterRequest | BarberRegisterRequest;

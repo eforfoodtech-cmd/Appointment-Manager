@@ -17,25 +17,158 @@ export const HealthCheckResponse = zod.object({
 /**
  * @summary Register a new user (barber or customer)
  */
-export const registerBodyPasswordMin = 6;
+export const registerBodyOneEmailMax = 254;
 
-export const RegisterBody = zod.object({
-  email: zod.string().email(),
-  password: zod.string().min(registerBodyPasswordMin),
-  name: zod.string(),
-  phone: zod.string().optional(),
-  role: zod.enum(["barber", "customer"]),
-  shopName: zod.string().optional().describe("Required if role is barber"),
-  shopAddress: zod.string().optional(),
-});
+export const registerBodyOnePasswordMin = 6;
+export const registerBodyOnePasswordMax = 72;
+
+export const registerBodyOnePhoneMin = 10;
+export const registerBodyOnePhoneMax = 30;
+
+export const registerBodyOnePhoneRegExp = new RegExp(
+  "^(?:(?:\\+|00)?90|0)?[\\s().-]\*5(?:[\\s().-]\*\\d){9}$",
+);
+export const registerBodyOneFirstNameMax = 100;
+
+export const registerBodyOneLastNameMax = 100;
+
+export const registerBodyTwoEmailMax = 254;
+
+export const registerBodyTwoPasswordMin = 6;
+export const registerBodyTwoPasswordMax = 72;
+
+export const registerBodyTwoPhoneMin = 10;
+export const registerBodyTwoPhoneMax = 30;
+
+export const registerBodyTwoPhoneRegExp = new RegExp(
+  "^(?:(?:\\+|00)?90|0)?[\\s().-]\*5(?:[\\s().-]\*\\d){9}$",
+);
+export const registerBodyTwoBusinessNameMax = 160;
+
+export const registerBodyTwoAuthorizedFirstNameMax = 100;
+
+export const registerBodyTwoAuthorizedLastNameMax = 100;
+
+export const registerBodyTwoAddressMax = 500;
+
+export const RegisterBody = zod.union([
+  zod.object({
+    email: zod
+      .string()
+      .email()
+      .max(registerBodyOneEmailMax)
+      .describe("Email address; normalized to lowercase by the server."),
+    password: zod
+      .string()
+      .min(registerBodyOnePasswordMin)
+      .max(registerBodyOnePasswordMax),
+    phone: zod
+      .string()
+      .min(registerBodyOnePhoneMin)
+      .max(registerBodyOnePhoneMax)
+      .regex(registerBodyOnePhoneRegExp)
+      .describe(
+        "Turkish mobile number. The server removes spaces, parentheses, and hyphens; accepts 5XXXXXXXXX, 05XXXXXXXXX, 905XXXXXXXXX, and +905XXXXXXXXX; and stores the canonical 05XXXXXXXXX form.",
+      ),
+    role: zod.enum(["customer"]),
+    firstName: zod.string().min(1).max(registerBodyOneFirstNameMax),
+    lastName: zod.string().min(1).max(registerBodyOneLastNameMax),
+    name: zod
+      .string()
+      .optional()
+      .describe("Legacy full-name alias; use firstName and lastName."),
+    surname: zod
+      .string()
+      .optional()
+      .describe("Legacy surname alias; use lastName."),
+  }),
+  zod.object({
+    email: zod
+      .string()
+      .email()
+      .max(registerBodyTwoEmailMax)
+      .describe("Email address; normalized to lowercase by the server."),
+    password: zod
+      .string()
+      .min(registerBodyTwoPasswordMin)
+      .max(registerBodyTwoPasswordMax),
+    phone: zod
+      .string()
+      .min(registerBodyTwoPhoneMin)
+      .max(registerBodyTwoPhoneMax)
+      .regex(registerBodyTwoPhoneRegExp)
+      .describe(
+        "Turkish mobile number. The server removes spaces, parentheses, and hyphens; accepts 5XXXXXXXXX, 05XXXXXXXXX, 905XXXXXXXXX, and +905XXXXXXXXX; and stores the canonical 05XXXXXXXXX form.",
+      ),
+    role: zod.enum(["barber"]),
+    businessName: zod.string().min(1).max(registerBodyTwoBusinessNameMax),
+    authorizedFirstName: zod
+      .string()
+      .min(1)
+      .max(registerBodyTwoAuthorizedFirstNameMax),
+    authorizedLastName: zod
+      .string()
+      .min(1)
+      .max(registerBodyTwoAuthorizedLastNameMax),
+    address: zod.string().min(1).max(registerBodyTwoAddressMax),
+    shopName: zod
+      .string()
+      .optional()
+      .describe("Legacy business-name alias; use businessName."),
+    shopAddress: zod
+      .string()
+      .optional()
+      .describe("Legacy address alias; use address."),
+    name: zod
+      .string()
+      .optional()
+      .describe("Legacy authorized-person name alias."),
+    surname: zod
+      .string()
+      .optional()
+      .describe("Legacy authorized-person surname alias."),
+  }),
+]);
 
 /**
- * @summary Login
+ * @summary Login with an email address or Turkish phone number
  */
-export const LoginBody = zod.object({
-  email: zod.string().email(),
-  password: zod.string(),
-});
+export const loginBodyOneIdentifierMax = 254;
+
+export const loginBodyOnePasswordMin = 6;
+export const loginBodyOnePasswordMax = 72;
+
+export const loginBodyTwoEmailMax = 254;
+
+export const loginBodyTwoPasswordMin = 6;
+export const loginBodyTwoPasswordMax = 72;
+
+export const LoginBody = zod.union([
+  zod.object({
+    identifier: zod
+      .string()
+      .min(1)
+      .max(loginBodyOneIdentifierMax)
+      .describe("Email address or a supported Turkish phone-number form."),
+    password: zod
+      .string()
+      .min(loginBodyOnePasswordMin)
+      .max(loginBodyOnePasswordMax),
+  }),
+  zod
+    .object({
+      email: zod
+        .string()
+        .email()
+        .max(loginBodyTwoEmailMax)
+        .describe("Legacy alias for identifier."),
+      password: zod
+        .string()
+        .min(loginBodyTwoPasswordMin)
+        .max(loginBodyTwoPasswordMax),
+    })
+    .describe("Legacy email-based login body; use identifier instead."),
+]);
 
 export const LoginResponse = zod.object({
   token: zod.string(),
@@ -43,10 +176,98 @@ export const LoginResponse = zod.object({
     id: zod.number(),
     email: zod.string(),
     name: zod.string(),
+    firstName: zod.string().nullish(),
+    lastName: zod.string().nullish(),
     phone: zod.string().nullish(),
     role: zod.enum(["barber", "customer"]),
     createdAt: zod.coerce.date(),
   }),
+});
+
+/**
+ * Returns the same response shape and message whether or not the account exists. The opaque resetId must also be indistinguishable for real and decoy requests so this endpoint cannot be used for account enumeration.
+ * @summary Request a password reset by email or phone
+ */
+export const requestPasswordResetBodyIdentifierMax = 254;
+
+export const RequestPasswordResetBody = zod.object({
+  identifier: zod
+    .string()
+    .min(1)
+    .max(requestPasswordResetBodyIdentifierMax)
+    .describe("Email address or a supported Turkish phone-number form."),
+  channel: zod
+    .enum(["email", "phone"])
+    .optional()
+    .describe(
+      "Preferred delivery channel. If omitted, the server infers it from the identifier.",
+    ),
+});
+
+export const RequestPasswordResetResponse = zod.object({
+  message: zod
+    .string()
+    .describe("Generic instructions that do not reveal account existence."),
+  resetId: zod
+    .string()
+    .min(1)
+    .describe(
+      "Opaque identifier for the verification attempt. Real and decoy IDs are indistinguishable.",
+    ),
+});
+
+/**
+ * Verifies a six-digit, single-use code and returns a short-lived opaque reset token. Invalid, expired, and unknown reset attempts use the same error response.
+ * @summary Verify a password-reset code
+ */
+
+export const verifyPasswordResetBodyCodeMin = 6;
+export const verifyPasswordResetBodyCodeMax = 6;
+
+export const verifyPasswordResetBodyCodeRegExp = new RegExp("^\\d{6}$");
+
+export const VerifyPasswordResetBody = zod.object({
+  resetId: zod
+    .string()
+    .min(1)
+    .describe("Opaque identifier returned by the reset request."),
+  code: zod
+    .string()
+    .min(verifyPasswordResetBodyCodeMin)
+    .max(verifyPasswordResetBodyCodeMax)
+    .regex(verifyPasswordResetBodyCodeRegExp)
+    .describe("Six-digit, single-use verification code."),
+});
+
+export const VerifyPasswordResetResponse = zod.object({
+  message: zod.string(),
+  resetToken: zod
+    .string()
+    .min(1)
+    .describe("Opaque, short-lived, single-use password-reset token."),
+});
+
+/**
+ * Consumes the short-lived reset token. A successfully consumed token cannot be reused.
+ * @summary Set a new password with a reset token
+ */
+
+export const resetPasswordBodyNewPasswordMin = 6;
+export const resetPasswordBodyNewPasswordMax = 72;
+
+export const ResetPasswordBody = zod.object({
+  resetToken: zod
+    .string()
+    .min(1)
+    .describe("Opaque token returned after successful code verification."),
+  newPassword: zod
+    .string()
+    .min(resetPasswordBodyNewPasswordMin)
+    .max(resetPasswordBodyNewPasswordMax),
+});
+
+export const ResetPasswordResponse = zod.object({
+  message: zod.string(),
 });
 
 /**
@@ -56,6 +277,8 @@ export const GetMeResponse = zod.object({
   id: zod.number(),
   email: zod.string(),
   name: zod.string(),
+  firstName: zod.string().nullish(),
+  lastName: zod.string().nullish(),
   phone: zod.string().nullish(),
   role: zod.enum(["barber", "customer"]),
   createdAt: zod.coerce.date(),

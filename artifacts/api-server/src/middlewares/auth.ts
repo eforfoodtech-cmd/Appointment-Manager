@@ -1,13 +1,27 @@
-import { Request, Response, NextFunction } from "express";
+import { type NextFunction, type Request, type Response } from "express";
 import jwt from "jsonwebtoken";
+import { eq } from "drizzle-orm";
+import { db, usersTable } from "@workspace/db";
 
-const JWT_SECRET = process.env["SESSION_SECRET"] || "tiras-secret-key";
+function jwtSecret() {
+  if (process.env.SESSION_SECRET) return process.env.SESSION_SECRET;
+  if (
+    process.env.NODE_ENV === "development" ||
+    process.env.NODE_ENV === "test"
+  ) {
+    return "development-only-tiras-secret-key";
+  }
+  throw new Error("SESSION_SECRET must be configured");
+}
+
+const JWT_SECRET = jwtSecret();
 
 export interface AuthUser {
   id: number;
   email: string;
   role: "barber" | "customer";
   name: string;
+  authVersion: number;
 }
 
 export interface AuthRequest extends Request {
@@ -18,24 +32,43 @@ export function createToken(user: AuthUser): string {
   return jwt.sign(user, JWT_SECRET, { expiresIn: "30d" });
 }
 
-export function authenticate(
+export async function authenticate(
   req: AuthRequest,
   res: Response,
   next: NextFunction,
-): void {
+): Promise<void> {
   const authHeader = req.headers.authorization;
   if (!authHeader?.startsWith("Bearer ")) {
     res.status(401).json({ error: "Kimlik doğrulama gerekli" });
     return;
   }
 
-  const token = authHeader.slice(7);
+  let payload: AuthUser;
   try {
-    const payload = jwt.verify(token, JWT_SECRET) as AuthUser;
-    req.user = payload;
-    next();
+    payload = jwt.verify(authHeader.slice(7), JWT_SECRET) as AuthUser;
   } catch {
     res.status(401).json({ error: "Geçersiz token" });
+    return;
+  }
+
+  try {
+    const [user] = await db
+      .select({ authVersion: usersTable.authVersion })
+      .from(usersTable)
+      .where(eq(usersTable.id, payload.id))
+      .limit(1);
+
+    // Tokens issued before authVersion was introduced represent version zero.
+    const tokenAuthVersion = payload.authVersion ?? 0;
+    if (!user || tokenAuthVersion !== user.authVersion) {
+      res.status(401).json({ error: "Oturumun süresi dolmuş" });
+      return;
+    }
+
+    req.user = payload;
+    next();
+  } catch (error) {
+    next(error);
   }
 }
 

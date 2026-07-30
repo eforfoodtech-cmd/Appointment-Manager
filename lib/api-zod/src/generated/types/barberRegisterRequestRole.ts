@@ -6,10 +6,9 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type RegisterRequestRole =
-  (typeof RegisterRequestRole)[keyof typeof RegisterRequestRole];
+export type BarberRegisterRequestRole =
+  (typeof BarberRegisterRequestRole)[keyof typeof BarberRegisterRequestRole];
 
-export const RegisterRequestRole = {
+export const BarberRegisterRequestRole = {
   barber: "barber",
-  customer: "customer",
 } as const;

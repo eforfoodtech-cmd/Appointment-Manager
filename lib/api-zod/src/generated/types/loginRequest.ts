@@ -5,8 +5,7 @@
  * Tıraş - Barber Appointment SaaS API
  * OpenAPI spec version: 0.1.0
  */
+import type { IdentifierLoginRequest } from "./identifierLoginRequest";
+import type { LegacyEmailLoginRequest } from "./legacyEmailLoginRequest";
 
-export interface LoginRequest {
-  email: string;
-  password: string;
-}
+export type LoginRequest = IdentifierLoginRequest | LegacyEmailLoginRequest;

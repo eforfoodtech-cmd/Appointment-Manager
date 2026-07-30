@@ -5,7 +5,11 @@ import {
   Inter_700Bold,
   useFonts,
 } from "@expo-google-fonts/inter";
-import { QueryClient, QueryClientProvider, focusManager } from "@tanstack/react-query";
+import {
+  QueryClient,
+  QueryClientProvider,
+  focusManager,
+} from "@tanstack/react-query";
 import { Stack, useRouter, usePathname, useSegments } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect, useRef } from "react";
@@ -28,7 +32,7 @@ function resolveApiBaseUrl() {
   if (Platform.OS === "web" && typeof window !== "undefined") {
     const { protocol, hostname, port, origin } = window.location;
 
-    if (port === "8081") {
+    if (port === "8081" || port === "8082") {
       return `${protocol}//${hostname}:8080`;
     }
 
@@ -59,7 +63,7 @@ if (Platform.OS !== "web") {
   });
 }
 
-const AUTH_PATHS = ["/login", "/register"];
+const AUTH_PATHS = ["/login", "/register", "/forgot-password"];
 
 function getHomePath(role?: "barber" | "customer" | null) {
   return role === "barber" ? "/(barber)" : "/(customer)";
@@ -97,7 +101,9 @@ function AuthGuard() {
     if (isLoading) return;
 
     const routeGroup = segments[0];
-    const isAuthScreen = AUTH_PATHS.some((p) => pathname === p || pathname.endsWith(p));
+    const isAuthScreen = AUTH_PATHS.some(
+      (p) => pathname === p || pathname.endsWith(p),
+    );
     const homePath = getHomePath(user?.role ?? null);
 
     if (!user) {
@@ -147,11 +153,19 @@ function RootLayoutNav() {
         <Stack.Screen name="(customer)" />
         <Stack.Screen
           name="book/[barberId]"
-          options={{ headerShown: true, title: "Randevu Al", headerBackTitle: "Geri" }}
+          options={{
+            headerShown: true,
+            title: "Randevu Al",
+            headerBackTitle: "Geri",
+          }}
         />
         <Stack.Screen
           name="appointment/[id]"
-          options={{ headerShown: true, title: "Randevu Detayı", headerBackTitle: "Geri" }}
+          options={{
+            headerShown: true,
+            title: "Randevu Detayı",
+            headerBackTitle: "Geri",
+          }}
         />
         <Stack.Screen
           name="scan-barber-qr"

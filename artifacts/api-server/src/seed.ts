@@ -1,29 +1,34 @@
 import bcrypt from "bcryptjs";
-import { and, eq, inArray } from "drizzle-orm";
-import { db, usersTable, barbersTable, customersTable } from "@workspace/db";
+import { eq, or } from "drizzle-orm";
+import { barbersTable, customersTable, db, usersTable } from "@workspace/db";
 
 type DemoUser = {
   email: string;
   password: string;
-  name: string;
+  firstName: string;
+  lastName: string;
   role: "barber" | "customer";
   phone: string;
   shopName?: string;
+  shopAddress?: string;
 };
 
 const DEMO_USERS: DemoUser[] = [
   {
-    email: "05550000001",
+    email: "berber@example.com",
     password: "123456",
-    name: "Demo Berber",
+    firstName: "Demo",
+    lastName: "Berber",
     role: "barber",
     phone: "05550000001",
     shopName: "Demo Berber Salonu",
+    shopAddress: "Atatürk Mahallesi, Demo Caddesi No: 1, İstanbul",
   },
   {
-    email: "05550000002",
+    email: "musteri@example.com",
     password: "123456",
-    name: "Demo Müşteri",
+    firstName: "Demo",
+    lastName: "Müşteri",
     role: "customer",
     phone: "05550000002",
   },
@@ -32,12 +37,46 @@ const DEMO_USERS: DemoUser[] = [
 export async function seedDemoUsers(): Promise<void> {
   for (const demoUser of DEMO_USERS) {
     const [existingUser] = await db
-      .select({ id: usersTable.id, role: usersTable.role })
+      .select()
       .from(usersTable)
-      .where(eq(usersTable.email, demoUser.email))
+      .where(
+        or(
+          eq(usersTable.email, demoUser.email),
+          eq(usersTable.phone, demoUser.phone),
+          // Previous demo versions stored the phone number in the email field.
+          eq(usersTable.email, demoUser.phone),
+        ),
+      )
       .limit(1);
 
     if (existingUser) {
+      await db
+        .update(usersTable)
+        .set({
+          ...(existingUser.email === demoUser.phone
+            ? { email: demoUser.email }
+            : {}),
+          name: `${demoUser.firstName} ${demoUser.lastName}`,
+          firstName: existingUser.firstName ?? demoUser.firstName,
+          lastName: existingUser.lastName ?? demoUser.lastName,
+          phone: demoUser.phone,
+        })
+        .where(eq(usersTable.id, existingUser.id));
+
+      if (demoUser.role === "barber") {
+        const [barber] = await db
+          .select()
+          .from(barbersTable)
+          .where(eq(barbersTable.userId, existingUser.id))
+          .limit(1);
+
+        if (barber && !barber.shopAddress) {
+          await db
+            .update(barbersTable)
+            .set({ shopAddress: demoUser.shopAddress })
+            .where(eq(barbersTable.id, barber.id));
+        }
+      }
       continue;
     }
 
@@ -49,7 +88,9 @@ export async function seedDemoUsers(): Promise<void> {
         .values({
           email: demoUser.email,
           passwordHash,
-          name: demoUser.name,
+          name: `${demoUser.firstName} ${demoUser.lastName}`,
+          firstName: demoUser.firstName,
+          lastName: demoUser.lastName,
           phone: demoUser.phone,
           role: demoUser.role,
         })
@@ -59,6 +100,7 @@ export async function seedDemoUsers(): Promise<void> {
         await tx.insert(barbersTable).values({
           userId: insertedUser.id,
           shopName: demoUser.shopName ?? "Demo Berber Salonu",
+          shopAddress: demoUser.shopAddress,
           isActive: true,
         });
       } else {

@@ -2,24 +2,19 @@
  * Shared appointment card component for both barber and customer views.
  */
 import React from "react";
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  Alert,
-} from "react-native";
+import { View, Text, StyleSheet, Alert } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import colors from "@/constants/colors";
+import { PressableScale } from "@/components/PressableScale";
 
 const c = colors.light;
 
 const STATUS_COLORS: Record<string, string> = {
-  pending: "#F59E0B",
-  confirmed: "#10B981",
-  cancelled: "#EF4444",
-  completed: "#6366F1",
-  no_show: "#EF4444",
+  pending: c.warning,
+  confirmed: c.success,
+  cancelled: c.destructive,
+  completed: c.primary,
+  no_show: c.destructive,
 };
 
 const STATUS_LABELS: Record<string, string> = {
@@ -77,10 +72,10 @@ export function AppointmentCard({
   const canCancelCust = canCustomerCancel(appt.date, appt.startTime);
 
   return (
-    <TouchableOpacity
+    <PressableScale
       style={styles.card}
       onPress={onPress}
-      activeOpacity={onPress ? 0.7 : 1}
+      scaleTo={onPress ? 0.985 : 1}
     >
       {/* Time strip */}
       <View style={[styles.timeStrip, { backgroundColor: statusColor }]}>
@@ -137,7 +132,11 @@ export function AppointmentCard({
                     "Bu randevuyu iptal etmek istediğine emin misin?",
                     [
                       { text: "Vazgeç", style: "cancel" },
-                      { text: "İptal Et", style: "destructive", onPress: onCancel },
+                      {
+                        text: "İptal Et",
+                        style: "destructive",
+                        onPress: onCancel,
+                      },
                     ],
                   )
                 }
@@ -148,20 +147,24 @@ export function AppointmentCard({
 
         {/* Cancel for customer — only when >5h remain */}
         {role === "customer" && isActive && onCancel && canCancelCust && (
-          <TouchableOpacity
+          <PressableScale
             style={styles.cancelBtn}
             onPress={() =>
-              Alert.alert("İptal Et", "Bu randevuyu iptal etmek istiyor musunuz?", [
-                { text: "Hayır", style: "cancel" },
-                { text: "İptal Et", style: "destructive", onPress: onCancel },
-              ])
+              Alert.alert(
+                "İptal Et",
+                "Bu randevuyu iptal etmek istiyor musunuz?",
+                [
+                  { text: "Hayır", style: "cancel" },
+                  { text: "İptal Et", style: "destructive", onPress: onCancel },
+                ],
+              )
             }
           >
             <Text style={styles.cancelText}>İptal Et</Text>
-          </TouchableOpacity>
+          </PressableScale>
         )}
       </View>
-    </TouchableOpacity>
+    </PressableScale>
   );
 }
 
@@ -175,13 +178,14 @@ function QuickBtn({
   onPress: () => void;
 }) {
   return (
-    <TouchableOpacity
+    <PressableScale
       style={[styles.quickBtn, { backgroundColor: color + "20" }]}
       onPress={onPress}
       hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+      scaleTo={0.92}
     >
       <Feather name={icon} size={14} color={color} />
-    </TouchableOpacity>
+    </PressableScale>
   );
 }
 
@@ -190,19 +194,19 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     backgroundColor: c.card,
     borderRadius: colors.radius,
-    marginHorizontal: 16,
-    marginBottom: 2,
+    marginHorizontal: 20,
+    marginBottom: 10,
     overflow: "hidden",
     borderWidth: 1,
     borderColor: c.border,
     shadowColor: "#000",
-    shadowOpacity: 0.04,
-    shadowRadius: 4,
-    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
     elevation: 2,
   },
   timeStrip: {
-    width: 56,
+    width: 62,
     alignItems: "center",
     justifyContent: "center",
     padding: 10,
@@ -210,23 +214,55 @@ const styles = StyleSheet.create({
   },
   time: { fontSize: 11, fontFamily: "Inter_700Bold", color: "#fff" },
   timeSep: { fontSize: 10, color: "rgba(255,255,255,0.7)" },
-  content: { flex: 1, padding: 12, gap: 4 },
-  topRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  nameRow: { flex: 1, flexDirection: "row", alignItems: "center", gap: 6, minWidth: 0 },
-  name: { fontSize: 15, fontFamily: "Inter_600SemiBold", color: c.foreground, flexShrink: 1 },
+  content: { flex: 1, padding: 14, gap: 5 },
+  topRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  nameRow: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    minWidth: 0,
+  },
+  name: {
+    fontSize: 15,
+    fontFamily: "Inter_600SemiBold",
+    color: c.foreground,
+    flexShrink: 1,
+  },
   manualTag: {
     backgroundColor: "#EDE9FE",
     borderRadius: 4,
     paddingHorizontal: 6,
     paddingVertical: 2,
   },
-  manualTagText: { fontSize: 10, fontFamily: "Inter_600SemiBold", color: "#7C3AED" },
-  badge: { borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
+  manualTagText: {
+    fontSize: 10,
+    fontFamily: "Inter_600SemiBold",
+    color: "#7C3AED",
+  },
+  badge: { borderRadius: 999, paddingHorizontal: 9, paddingVertical: 4 },
   badgeText: { fontSize: 11, fontFamily: "Inter_600SemiBold" },
-  sub: { fontSize: 12, fontFamily: "Inter_400Regular", color: c.mutedForeground },
-  notes: { fontSize: 12, fontFamily: "Inter_400Regular", color: c.mutedForeground, fontStyle: "italic" },
+  sub: {
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
+    color: c.mutedForeground,
+  },
+  notes: {
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
+    color: c.mutedForeground,
+    fontStyle: "italic",
+  },
   actions: { flexDirection: "row", gap: 8, marginTop: 6 },
-  quickBtn: { borderRadius: 8, padding: 6 },
+  quickBtn: { borderRadius: 8, padding: 7 },
   cancelBtn: { marginTop: 6, alignSelf: "flex-start" },
-  cancelText: { fontSize: 12, fontFamily: "Inter_500Medium", color: c.destructive },
+  cancelText: {
+    fontSize: 12,
+    fontFamily: "Inter_500Medium",
+    color: c.destructive,
+  },
 });

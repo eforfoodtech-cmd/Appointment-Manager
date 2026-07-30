@@ -14,29 +14,222 @@ export interface ErrorResponse {
   message?: string;
 }
 
-export type RegisterRequestRole =
-  (typeof RegisterRequestRole)[keyof typeof RegisterRequestRole];
+/**
+ * Turkish mobile number. The server removes spaces, parentheses, and hyphens; accepts 5XXXXXXXXX, 05XXXXXXXXX, 905XXXXXXXXX, and +905XXXXXXXXX; and stores the canonical 05XXXXXXXXX form.
+ * @minLength 10
+ * @maxLength 30
+ * @pattern ^(?:(?:\+|00)?90|0)?[\s().-]*5(?:[\s().-]*\d){9}$
+ */
+export type TurkishPhoneNumber = string;
 
-export const RegisterRequestRole = {
-  barber: "barber",
+export type CustomerRegisterRequestRole =
+  (typeof CustomerRegisterRequestRole)[keyof typeof CustomerRegisterRequestRole];
+
+export const CustomerRegisterRequestRole = {
   customer: "customer",
 } as const;
 
-export interface RegisterRequest {
+export interface CustomerRegisterRequest {
+  /**
+   * Email address; normalized to lowercase by the server.
+   * @maxLength 254
+   */
   email: string;
-  /** @minLength 6 */
+  /**
+   * @minLength 6
+   * @maxLength 72
+   */
   password: string;
-  name: string;
-  phone?: string;
-  role: RegisterRequestRole;
-  /** Required if role is barber */
-  shopName?: string;
-  shopAddress?: string;
+  phone: TurkishPhoneNumber;
+  role: CustomerRegisterRequestRole;
+  /**
+   * @minLength 1
+   * @maxLength 100
+   */
+  firstName: string;
+  /**
+   * @minLength 1
+   * @maxLength 100
+   */
+  lastName: string;
+  /**
+   * Legacy full-name alias; use firstName and lastName.
+   * @deprecated
+   */
+  name?: string;
+  /**
+   * Legacy surname alias; use lastName.
+   * @deprecated
+   */
+  surname?: string;
 }
 
-export interface LoginRequest {
+export type BarberRegisterRequestRole =
+  (typeof BarberRegisterRequestRole)[keyof typeof BarberRegisterRequestRole];
+
+export const BarberRegisterRequestRole = {
+  barber: "barber",
+} as const;
+
+export interface BarberRegisterRequest {
+  /**
+   * Email address; normalized to lowercase by the server.
+   * @maxLength 254
+   */
   email: string;
+  /**
+   * @minLength 6
+   * @maxLength 72
+   */
   password: string;
+  phone: TurkishPhoneNumber;
+  role: BarberRegisterRequestRole;
+  /**
+   * @minLength 1
+   * @maxLength 160
+   */
+  businessName: string;
+  /**
+   * @minLength 1
+   * @maxLength 100
+   */
+  authorizedFirstName: string;
+  /**
+   * @minLength 1
+   * @maxLength 100
+   */
+  authorizedLastName: string;
+  /**
+   * @minLength 1
+   * @maxLength 500
+   */
+  address: string;
+  /**
+   * Legacy business-name alias; use businessName.
+   * @deprecated
+   */
+  shopName?: string;
+  /**
+   * Legacy address alias; use address.
+   * @deprecated
+   */
+  shopAddress?: string;
+  /**
+   * Legacy authorized-person name alias.
+   * @deprecated
+   */
+  name?: string;
+  /**
+   * Legacy authorized-person surname alias.
+   * @deprecated
+   */
+  surname?: string;
+}
+
+export type RegisterRequest = CustomerRegisterRequest | BarberRegisterRequest;
+
+export interface IdentifierLoginRequest {
+  /**
+   * Email address or a supported Turkish phone-number form.
+   * @minLength 1
+   * @maxLength 254
+   */
+  identifier: string;
+  /**
+   * @minLength 6
+   * @maxLength 72
+   */
+  password: string;
+}
+
+/**
+ * Legacy email-based login body; use identifier instead.
+ * @deprecated
+ */
+export interface LegacyEmailLoginRequest {
+  /**
+   * Legacy alias for identifier.
+   * @deprecated
+   * @maxLength 254
+   */
+  email: string;
+  /**
+   * @minLength 6
+   * @maxLength 72
+   */
+  password: string;
+}
+
+export type LoginRequest = IdentifierLoginRequest | LegacyEmailLoginRequest;
+
+export type PasswordResetChannel =
+  (typeof PasswordResetChannel)[keyof typeof PasswordResetChannel];
+
+export const PasswordResetChannel = {
+  email: "email",
+  phone: "phone",
+} as const;
+
+export interface PasswordResetRequest {
+  /**
+   * Email address or a supported Turkish phone-number form.
+   * @minLength 1
+   * @maxLength 254
+   */
+  identifier: string;
+  /** Preferred delivery channel. If omitted, the server infers it from the identifier. */
+  channel?: PasswordResetChannel;
+}
+
+export interface PasswordResetRequestResponse {
+  /** Generic instructions that do not reveal account existence. */
+  message: string;
+  /**
+   * Opaque identifier for the verification attempt. Real and decoy IDs are indistinguishable.
+   * @minLength 1
+   */
+  resetId: string;
+}
+
+export interface PasswordResetVerifyRequest {
+  /**
+   * Opaque identifier returned by the reset request.
+   * @minLength 1
+   */
+  resetId: string;
+  /**
+   * Six-digit, single-use verification code.
+   * @minLength 6
+   * @maxLength 6
+   * @pattern ^\d{6}$
+   */
+  code: string;
+}
+
+export interface PasswordResetVerifyResponse {
+  message: string;
+  /**
+   * Opaque, short-lived, single-use password-reset token.
+   * @minLength 1
+   */
+  resetToken: string;
+}
+
+export interface PasswordResetConfirmRequest {
+  /**
+   * Opaque token returned after successful code verification.
+   * @minLength 1
+   */
+  resetToken: string;
+  /**
+   * @minLength 6
+   * @maxLength 72
+   */
+  newPassword: string;
+}
+
+export interface PasswordResetMessageResponse {
+  message: string;
 }
 
 export type UserRole = (typeof UserRole)[keyof typeof UserRole];
@@ -50,6 +243,8 @@ export interface User {
   id: number;
   email: string;
   name: string;
+  firstName?: string | null;
+  lastName?: string | null;
   phone?: string | null;
   role: UserRole;
   createdAt: string;

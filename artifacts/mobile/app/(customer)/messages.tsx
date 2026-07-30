@@ -73,14 +73,14 @@ export default function CustomerMessages() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: c.background },
-  title: { fontSize: 22, fontFamily: "Inter_700Bold", color: c.foreground, paddingHorizontal: 20, paddingVertical: 16 },
+  title: { fontSize: 24, fontFamily: "Inter_700Bold", color: c.foreground, paddingHorizontal: 20, paddingTop: 18, paddingBottom: 14 },
   empty: { alignItems: "center", paddingVertical: 60, gap: 12 },
   emptyText: { fontSize: 15, fontFamily: "Inter_400Regular", color: c.mutedForeground },
   msgRow: { alignItems: "flex-start" },
   msgRowSent: { alignItems: "flex-end" },
   bubble: {
     backgroundColor: c.card,
-    borderRadius: 14,
+    borderRadius: colors.radius,
     padding: 12,
     maxWidth: "80%",
     borderWidth: 1,
