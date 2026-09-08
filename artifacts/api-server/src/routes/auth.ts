@@ -15,6 +15,7 @@ import bcrypt from "bcryptjs";
 import { and, eq, gt, isNull, lt, or, sql } from "drizzle-orm";
 import {
   barbersTable,
+  barberAccessTable,
   customersTable,
   db,
   passwordResetsTable,
@@ -30,10 +31,7 @@ import {
   type PasswordResetChannel,
 } from "../lib/passwordResetDelivery";
 import { logger } from "../lib/logger";
-import {
-  parseCanonicalTurkishPhone,
-  toTurkishPhoneE164,
-} from "../lib/phone";
+import { parseCanonicalTurkishPhone, toTurkishPhoneE164 } from "../lib/phone";
 
 const router = Router();
 
@@ -381,7 +379,7 @@ router.post("/register", async (req, res) => {
   }
 
   const duplicate = await db
-    .select({ id: usersTable.id })
+    .select({ email: usersTable.email, phone: usersTable.phone })
     .from(usersTable)
     .where(
       or(
@@ -390,13 +388,24 @@ router.post("/register", async (req, res) => {
         // Covers legacy rows before their demo data is migrated.
         eq(usersTable.email, phone),
       ),
-    )
-    .limit(1);
+    );
 
   if (duplicate.length > 0) {
-    res
-      .status(409)
-      .json({ error: "Bu e-posta veya telefon numarası zaten kullanılıyor." });
+    const emailTaken = duplicate.some((user) => user.email === email);
+    const phoneTaken = duplicate.some(
+      (user) => user.phone === phone || user.email === phone,
+    );
+    const fields = [
+      ...(emailTaken ? ["email"] : []),
+      ...(phoneTaken ? ["phone"] : []),
+    ];
+    const error =
+      emailTaken && phoneTaken
+        ? "Bu e-posta ve telefon numarası zaten kullanılıyor. Giriş yapmayı deneyin."
+        : emailTaken
+          ? "Bu e-posta adresi zaten kullanılıyor. Giriş yapmayı deneyin."
+          : "Bu telefon numarası zaten kullanılıyor. Giriş yapmayı deneyin.";
+    res.status(409).json({ error, code: "ACCOUNT_CONFLICT", fields });
     return;
   }
 
@@ -419,12 +428,34 @@ router.post("/register", async (req, res) => {
         .returning();
 
       if (role === "barber") {
-        await tx.insert(barbersTable).values({
-          userId: insertedUser.id,
-          shopName: businessName,
-          shopAddress: address,
-          isActive: true,
-        });
+        const [insertedBarber] = await tx
+          .insert(barbersTable)
+          .values({
+            userId: insertedUser.id,
+            shopName: businessName,
+            shopAddress: address,
+            isActive: true,
+          })
+          .returning({ id: barbersTable.id });
+
+        let accessCodeCreated = false;
+        for (let attempt = 0; attempt < 20; attempt++) {
+          const [access] = await tx
+            .insert(barberAccessTable)
+            .values({
+              barberId: insertedBarber.id,
+              code: String(randomInt(100000, 1000000)),
+            })
+            .onConflictDoNothing()
+            .returning({ code: barberAccessTable.code });
+          if (access) {
+            accessCodeCreated = true;
+            break;
+          }
+        }
+        if (!accessCodeCreated) {
+          throw new Error("Berber erişim kodu oluşturulamadı.");
+        }
       } else {
         await tx.insert(customersTable).values({ userId: insertedUser.id });
       }

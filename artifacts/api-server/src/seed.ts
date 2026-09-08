@@ -1,6 +1,14 @@
 import bcrypt from "bcryptjs";
+import { randomInt } from "node:crypto";
 import { eq, or } from "drizzle-orm";
-import { barbersTable, customersTable, db, usersTable } from "@workspace/db";
+import {
+  barbersTable,
+  barberAccessTable,
+  customersTable,
+  db,
+  servicesTable,
+  usersTable,
+} from "@workspace/db";
 
 type DemoUser = {
   email: string;
@@ -33,6 +41,73 @@ const DEMO_USERS: DemoUser[] = [
     phone: "5550000002",
   },
 ];
+
+const DEFAULT_DEMO_SERVICES = [
+  {
+    name: "Saç Kesimi",
+    description: "Klasik veya modern saç kesimi",
+    priceKurus: 30000,
+    durationMinutes: 45,
+    bufferMinutes: 0,
+  },
+  {
+    name: "Sakal Tıraşı",
+    description: "Sakal kesimi ve şekillendirme",
+    priceKurus: 15000,
+    durationMinutes: 30,
+    bufferMinutes: 0,
+  },
+  {
+    name: "Saç + Sakal",
+    description: "Saç kesimi ve sakal tıraşı paketi",
+    priceKurus: 40000,
+    durationMinutes: 60,
+    bufferMinutes: 0,
+  },
+];
+
+async function ensureDemoServices(barberId: number): Promise<void> {
+  const [existingService] = await db
+    .select({ id: servicesTable.id })
+    .from(servicesTable)
+    .where(eq(servicesTable.barberId, barberId))
+    .limit(1);
+
+  if (!existingService) {
+    await db.insert(servicesTable).values(
+      DEFAULT_DEMO_SERVICES.map((service) => ({
+        barberId,
+        ...service,
+      })),
+    );
+  }
+}
+
+async function ensureBarberAccessCode(barberId: number): Promise<void> {
+  const [existing] = await db
+    .select({ code: barberAccessTable.code })
+    .from(barberAccessTable)
+    .where(eq(barberAccessTable.barberId, barberId))
+    .limit(1);
+  if (existing) return;
+
+  for (let attempt = 0; attempt < 20; attempt++) {
+    const [created] = await db
+      .insert(barberAccessTable)
+      .values({ barberId, code: String(randomInt(100000, 1000000)) })
+      .onConflictDoNothing()
+      .returning({ code: barberAccessTable.code });
+    if (created) return;
+
+    const [createdByAnotherRequest] = await db
+      .select({ code: barberAccessTable.code })
+      .from(barberAccessTable)
+      .where(eq(barberAccessTable.barberId, barberId))
+      .limit(1);
+    if (createdByAnotherRequest) return;
+  }
+  throw new Error(`Berber ${barberId} için erişim kodu oluşturulamadı.`);
+}
 
 export async function seedDemoUsers(): Promise<void> {
   for (const demoUser of DEMO_USERS) {
@@ -79,6 +154,7 @@ export async function seedDemoUsers(): Promise<void> {
             .set({ shopAddress: demoUser.shopAddress })
             .where(eq(barbersTable.id, barber.id));
         }
+        if (barber) await ensureDemoServices(barber.id);
       }
       continue;
     }
@@ -100,15 +176,32 @@ export async function seedDemoUsers(): Promise<void> {
         .returning({ id: usersTable.id });
 
       if (demoUser.role === "barber") {
-        await tx.insert(barbersTable).values({
-          userId: insertedUser.id,
-          shopName: demoUser.shopName ?? "Demo Berber Salonu",
-          shopAddress: demoUser.shopAddress,
-          isActive: true,
-        });
+        const [insertedBarber] = await tx
+          .insert(barbersTable)
+          .values({
+            userId: insertedUser.id,
+            shopName: demoUser.shopName ?? "Demo Berber Salonu",
+            shopAddress: demoUser.shopAddress,
+            isActive: true,
+          })
+          .returning({ id: barbersTable.id });
+
+        await tx.insert(servicesTable).values(
+          DEFAULT_DEMO_SERVICES.map((service) => ({
+            barberId: insertedBarber.id,
+            ...service,
+          })),
+        );
       } else {
         await tx.insert(customersTable).values({ userId: insertedUser.id });
       }
     });
+  }
+
+  const barberProfiles = await db
+    .select({ id: barbersTable.id })
+    .from(barbersTable);
+  for (const barber of barberProfiles) {
+    await ensureBarberAccessCode(barber.id);
   }
 }

@@ -26,6 +26,1283 @@ tags:
     description: Push notifications
 
 paths:
+  /account:
+    {
+      "get":
+        {
+          "operationId": "getAccount",
+          "security": [{ "bearerAuth": [] }],
+          "parameters": [],
+          "responses":
+            {
+              "200":
+                {
+                  "description": "Success",
+                  "content":
+                    {
+                      "application/json":
+                        {
+                          "schema":
+                            {
+                              "type": "object",
+                              "properties":
+                                {
+                                  "name": { "type": "string" },
+                                  "email": { "type": "string" },
+                                  "phone":
+                                    { "type": "string", "nullable": true },
+                                  "avatar":
+                                    { "type": "string", "nullable": true },
+                                  "gallery":
+                                    {
+                                      "type": "array",
+                                      "items": { "type": "string" },
+                                    },
+                                  "emailVerifiedAt":
+                                    { "type": "string", "nullable": true },
+                                  "phoneVerifiedAt":
+                                    { "type": "string", "nullable": true },
+                                },
+                              "required":
+                                [
+                                  "name",
+                                  "email",
+                                  "phone",
+                                  "avatar",
+                                  "gallery",
+                                  "emailVerifiedAt",
+                                  "phoneVerifiedAt",
+                                ],
+                            },
+                        },
+                    },
+                },
+              "400": { "description": "Invalid input" },
+              "401": { "description": "Unauthenticated" },
+              "403": { "description": "Forbidden" },
+              "409": { "description": "Conflict" },
+              "503": { "description": "Delivery unavailable" },
+            },
+        },
+      "patch":
+        {
+          "operationId": "updateAccount",
+          "security": [{ "bearerAuth": [] }],
+          "parameters": [],
+          "requestBody":
+            {
+              "required": true,
+              "content":
+                {
+                  "application/json":
+                    {
+                      "schema":
+                        {
+                          "type": "object",
+                          "properties":
+                            {
+                              "name": { "type": "string" },
+                              "email": { "type": "string" },
+                              "phone": { "type": "string" },
+                              "currentPassword": { "type": "string" },
+                            },
+                          "required":
+                            ["name", "email", "phone", "currentPassword"],
+                        },
+                    },
+                },
+            },
+          "responses":
+            {
+              "200":
+                {
+                  "description": "Success",
+                  "content":
+                    {
+                      "application/json":
+                        {
+                          "schema":
+                            {
+                              "type": "object",
+                              "properties": { "ok": { "type": "boolean" } },
+                              "required": ["ok"],
+                            },
+                        },
+                    },
+                },
+              "400": { "description": "Invalid input" },
+              "401": { "description": "Unauthenticated" },
+              "403": { "description": "Forbidden" },
+              "409": { "description": "Conflict" },
+              "503": { "description": "Delivery unavailable" },
+            },
+        },
+      "delete":
+        {
+          "operationId": "deleteAccount",
+          "security": [{ "bearerAuth": [] }],
+          "parameters": [],
+          "requestBody":
+            {
+              "required": true,
+              "content":
+                {
+                  "application/json":
+                    {
+                      "schema":
+                        {
+                          "type": "object",
+                          "properties":
+                            {
+                              "currentPassword": { "type": "string" },
+                              "confirmation": { "type": "string" },
+                            },
+                          "required": ["currentPassword", "confirmation"],
+                        },
+                    },
+                },
+            },
+          "responses":
+            {
+              "200":
+                {
+                  "description": "Success",
+                  "content":
+                    {
+                      "application/json":
+                        {
+                          "schema":
+                            {
+                              "type": "object",
+                              "properties": { "ok": { "type": "boolean" } },
+                              "required": ["ok"],
+                            },
+                        },
+                    },
+                },
+              "400": { "description": "Invalid input" },
+              "401": { "description": "Unauthenticated" },
+              "403": { "description": "Forbidden" },
+              "409": { "description": "Conflict" },
+              "503": { "description": "Delivery unavailable" },
+            },
+        },
+    }
+  /account/media:
+    {
+      "put":
+        {
+          "operationId": "saveAccountMedia",
+          "security": [{ "bearerAuth": [] }],
+          "parameters": [],
+          "requestBody":
+            {
+              "required": true,
+              "content":
+                {
+                  "application/json":
+                    {
+                      "schema":
+                        {
+                          "type": "object",
+                          "properties":
+                            {
+                              "avatar": { "type": "string", "nullable": true },
+                              "gallery":
+                                {
+                                  "type": "array",
+                                  "items": { "type": "string" },
+                                },
+                            },
+                          "required": ["avatar", "gallery"],
+                        },
+                    },
+                },
+            },
+          "responses":
+            {
+              "200":
+                {
+                  "description": "Success",
+                  "content":
+                    {
+                      "application/json":
+                        {
+                          "schema":
+                            {
+                              "type": "object",
+                              "properties": { "ok": { "type": "boolean" } },
+                              "required": ["ok"],
+                            },
+                        },
+                    },
+                },
+              "400": { "description": "Invalid input" },
+              "401": { "description": "Unauthenticated" },
+              "403": { "description": "Forbidden" },
+              "409": { "description": "Conflict" },
+              "503": { "description": "Delivery unavailable" },
+            },
+        },
+    }
+  /barbers/{id}/media:
+    {
+      "get":
+        {
+          "operationId": "getBarberMedia",
+          "parameters":
+            [
+              {
+                "name": "id",
+                "in": "path",
+                "required": true,
+                "schema": { "type": "integer" },
+              },
+            ],
+          "responses":
+            {
+              "200":
+                {
+                  "description": "Success",
+                  "content":
+                    {
+                      "application/json":
+                        {
+                          "schema":
+                            {
+                              "type": "object",
+                              "properties":
+                                {
+                                  "avatar":
+                                    { "type": "string", "nullable": true },
+                                  "gallery":
+                                    {
+                                      "type": "array",
+                                      "items": { "type": "string" },
+                                    },
+                                },
+                              "required": ["avatar", "gallery"],
+                            },
+                        },
+                    },
+                },
+              "400": { "description": "Invalid input" },
+              "401": { "description": "Unauthenticated" },
+              "403": { "description": "Forbidden" },
+              "409": { "description": "Conflict" },
+              "503": { "description": "Delivery unavailable" },
+            },
+        },
+    }
+  /account/password:
+    {
+      "post":
+        {
+          "operationId": "changeAccountPassword",
+          "security": [{ "bearerAuth": [] }],
+          "parameters": [],
+          "requestBody":
+            {
+              "required": true,
+              "content":
+                {
+                  "application/json":
+                    {
+                      "schema":
+                        {
+                          "type": "object",
+                          "properties":
+                            {
+                              "currentPassword": { "type": "string" },
+                              "newPassword": { "type": "string" },
+                            },
+                          "required": ["currentPassword", "newPassword"],
+                        },
+                    },
+                },
+            },
+          "responses":
+            {
+              "200":
+                {
+                  "description": "Success",
+                  "content":
+                    {
+                      "application/json":
+                        {
+                          "schema":
+                            {
+                              "type": "object",
+                              "properties": { "ok": { "type": "boolean" } },
+                              "required": ["ok"],
+                            },
+                        },
+                    },
+                },
+              "400": { "description": "Invalid input" },
+              "401": { "description": "Unauthenticated" },
+              "403": { "description": "Forbidden" },
+              "409": { "description": "Conflict" },
+              "503": { "description": "Delivery unavailable" },
+            },
+        },
+    }
+  /account/logout-all:
+    {
+      "post":
+        {
+          "operationId": "logoutAllSessions",
+          "security": [{ "bearerAuth": [] }],
+          "parameters": [],
+          "responses":
+            {
+              "200":
+                {
+                  "description": "Success",
+                  "content":
+                    {
+                      "application/json":
+                        {
+                          "schema":
+                            {
+                              "type": "object",
+                              "properties": { "ok": { "type": "boolean" } },
+                              "required": ["ok"],
+                            },
+                        },
+                    },
+                },
+              "400": { "description": "Invalid input" },
+              "401": { "description": "Unauthenticated" },
+              "403": { "description": "Forbidden" },
+              "409": { "description": "Conflict" },
+              "503": { "description": "Delivery unavailable" },
+            },
+        },
+    }
+  /account/sessions:
+    {
+      "get":
+        {
+          "operationId": "listAccountSessions",
+          "security": [{ "bearerAuth": [] }],
+          "parameters": [],
+          "responses":
+            {
+              "200":
+                {
+                  "description": "Success",
+                  "content":
+                    {
+                      "application/json":
+                        {
+                          "schema":
+                            {
+                              "type": "array",
+                              "items":
+                                {
+                                  "type": "object",
+                                  "properties":
+                                    {
+                                      "id": { "type": "string" },
+                                      "device": { "type": "string" },
+                                      "lastSeenAt": { "type": "string" },
+                                      "current": { "type": "boolean" },
+                                    },
+                                  "required":
+                                    ["id", "device", "lastSeenAt", "current"],
+                                },
+                            },
+                        },
+                    },
+                },
+              "400": { "description": "Invalid input" },
+              "401": { "description": "Unauthenticated" },
+              "403": { "description": "Forbidden" },
+              "409": { "description": "Conflict" },
+              "503": { "description": "Delivery unavailable" },
+            },
+        },
+    }
+  /account/sessions/{id}:
+    {
+      "delete":
+        {
+          "operationId": "revokeAccountSession",
+          "security": [{ "bearerAuth": [] }],
+          "parameters":
+            [
+              {
+                "name": "id",
+                "in": "path",
+                "required": true,
+                "schema": { "type": "string" },
+              },
+            ],
+          "responses":
+            {
+              "200":
+                {
+                  "description": "Success",
+                  "content":
+                    {
+                      "application/json":
+                        {
+                          "schema":
+                            {
+                              "type": "object",
+                              "properties": { "ok": { "type": "boolean" } },
+                              "required": ["ok"],
+                            },
+                        },
+                    },
+                },
+              "400": { "description": "Invalid input" },
+              "401": { "description": "Unauthenticated" },
+              "403": { "description": "Forbidden" },
+              "409": { "description": "Conflict" },
+              "503": { "description": "Delivery unavailable" },
+            },
+        },
+    }
+  /account/verification:
+    {
+      "post":
+        {
+          "operationId": "requestContactVerification",
+          "security": [{ "bearerAuth": [] }],
+          "parameters": [],
+          "requestBody":
+            {
+              "required": true,
+              "content":
+                {
+                  "application/json":
+                    {
+                      "schema":
+                        {
+                          "type": "object",
+                          "properties":
+                            {
+                              "channel":
+                                {
+                                  "type": "string",
+                                  "enum": ["email", "phone"],
+                                },
+                            },
+                          "required": ["channel"],
+                        },
+                    },
+                },
+            },
+          "responses":
+            {
+              "200":
+                {
+                  "description": "Success",
+                  "content":
+                    {
+                      "application/json":
+                        {
+                          "schema":
+                            {
+                              "type": "object",
+                              "properties": { "id": { "type": "integer" } },
+                              "required": ["id"],
+                            },
+                        },
+                    },
+                },
+              "400": { "description": "Invalid input" },
+              "401": { "description": "Unauthenticated" },
+              "403": { "description": "Forbidden" },
+              "409": { "description": "Conflict" },
+              "503": { "description": "Delivery unavailable" },
+            },
+        },
+    }
+  /account/verification/confirm:
+    {
+      "post":
+        {
+          "operationId": "confirmContactVerification",
+          "security": [{ "bearerAuth": [] }],
+          "parameters": [],
+          "requestBody":
+            {
+              "required": true,
+              "content":
+                {
+                  "application/json":
+                    {
+                      "schema":
+                        {
+                          "type": "object",
+                          "properties":
+                            {
+                              "id": { "type": "integer" },
+                              "code": { "type": "string" },
+                            },
+                          "required": ["id", "code"],
+                        },
+                    },
+                },
+            },
+          "responses":
+            {
+              "200":
+                {
+                  "description": "Success",
+                  "content":
+                    {
+                      "application/json":
+                        {
+                          "schema":
+                            {
+                              "type": "object",
+                              "properties": { "ok": { "type": "boolean" } },
+                              "required": ["ok"],
+                            },
+                        },
+                    },
+                },
+              "400": { "description": "Invalid input" },
+              "401": { "description": "Unauthenticated" },
+              "403": { "description": "Forbidden" },
+              "409": { "description": "Conflict" },
+              "503": { "description": "Delivery unavailable" },
+            },
+        },
+    }
+  /notifications:
+    {
+      "get":
+        {
+          "operationId": "listNotifications",
+          "security": [{ "bearerAuth": [] }],
+          "parameters": [],
+          "responses":
+            {
+              "200":
+                {
+                  "description": "Success",
+                  "content":
+                    {
+                      "application/json":
+                        {
+                          "schema":
+                            {
+                              "type": "array",
+                              "items":
+                                {
+                                  "type": "object",
+                                  "properties":
+                                    {
+                                      "id": { "type": "integer" },
+                                      "appointmentId":
+                                        { "type": "integer", "nullable": true },
+                                      "title": { "type": "string" },
+                                      "body": { "type": "string" },
+                                      "readAt":
+                                        { "type": "string", "nullable": true },
+                                      "createdAt": { "type": "string" },
+                                    },
+                                  "required":
+                                    [
+                                      "id",
+                                      "appointmentId",
+                                      "title",
+                                      "body",
+                                      "readAt",
+                                      "createdAt",
+                                    ],
+                                },
+                            },
+                        },
+                    },
+                },
+              "400": { "description": "Invalid input" },
+              "401": { "description": "Unauthenticated" },
+              "403": { "description": "Forbidden" },
+              "409": { "description": "Conflict" },
+              "503": { "description": "Delivery unavailable" },
+            },
+        },
+    }
+  /notifications/{id}/read:
+    {
+      "patch":
+        {
+          "operationId": "readNotification",
+          "security": [{ "bearerAuth": [] }],
+          "parameters":
+            [
+              {
+                "name": "id",
+                "in": "path",
+                "required": true,
+                "schema": { "type": "integer" },
+              },
+            ],
+          "responses":
+            {
+              "200":
+                {
+                  "description": "Success",
+                  "content":
+                    {
+                      "application/json":
+                        {
+                          "schema":
+                            {
+                              "type": "object",
+                              "properties": { "ok": { "type": "boolean" } },
+                              "required": ["ok"],
+                            },
+                        },
+                    },
+                },
+              "400": { "description": "Invalid input" },
+              "401": { "description": "Unauthenticated" },
+              "403": { "description": "Forbidden" },
+              "409": { "description": "Conflict" },
+              "503": { "description": "Delivery unavailable" },
+            },
+        },
+    }
+  /barbers/{barberId}/services:
+    {
+      "get":
+        {
+          "operationId": "listServices",
+          "parameters":
+            [
+              {
+                "name": "barberId",
+                "in": "path",
+                "required": true,
+                "schema": { "type": "integer" },
+              },
+            ],
+          "responses":
+            {
+              "200":
+                {
+                  "description": "Success",
+                  "content":
+                    {
+                      "application/json":
+                        {
+                          "schema":
+                            {
+                              "type": "array",
+                              "items":
+                                {
+                                  "type": "object",
+                                  "properties":
+                                    {
+                                      "id": { "type": "integer" },
+                                      "barberId": { "type": "integer" },
+                                      "name": { "type": "string" },
+                                      "description": { "type": "string" },
+                                      "priceKurus": { "type": "integer" },
+                                      "durationMinutes": { "type": "integer" },
+                                      "bufferMinutes": { "type": "integer" },
+                                      "isActive": { "type": "boolean" },
+                                    },
+                                  "required":
+                                    [
+                                      "id",
+                                      "barberId",
+                                      "name",
+                                      "description",
+                                      "priceKurus",
+                                      "durationMinutes",
+                                      "bufferMinutes",
+                                      "isActive",
+                                    ],
+                                },
+                            },
+                        },
+                    },
+                },
+              "400": { "description": "Invalid input" },
+              "401": { "description": "Unauthenticated" },
+              "403": { "description": "Forbidden" },
+              "409": { "description": "Conflict" },
+            },
+        },
+    }
+  /barbers/me/services:
+    {
+      "post":
+        {
+          "operationId": "createService",
+          "security": [{ "bearerAuth": [] }],
+          "parameters": [],
+          "requestBody":
+            {
+              "required": true,
+              "content":
+                {
+                  "application/json":
+                    {
+                      "schema":
+                        {
+                          "type": "object",
+                          "properties":
+                            {
+                              "name": { "type": "string" },
+                              "description": { "type": "string" },
+                              "priceKurus": { "type": "integer" },
+                              "durationMinutes": { "type": "integer" },
+                              "bufferMinutes": { "type": "integer" },
+                            },
+                          "required": ["name", "priceKurus", "durationMinutes"],
+                        },
+                    },
+                },
+            },
+          "responses":
+            {
+              "201":
+                {
+                  "description": "Success",
+                  "content":
+                    {
+                      "application/json":
+                        {
+                          "schema":
+                            {
+                              "type": "object",
+                              "properties":
+                                {
+                                  "id": { "type": "integer" },
+                                  "barberId": { "type": "integer" },
+                                  "name": { "type": "string" },
+                                  "description": { "type": "string" },
+                                  "priceKurus": { "type": "integer" },
+                                  "durationMinutes": { "type": "integer" },
+                                  "bufferMinutes": { "type": "integer" },
+                                  "isActive": { "type": "boolean" },
+                                },
+                              "required":
+                                [
+                                  "id",
+                                  "barberId",
+                                  "name",
+                                  "description",
+                                  "priceKurus",
+                                  "durationMinutes",
+                                  "bufferMinutes",
+                                  "isActive",
+                                ],
+                            },
+                        },
+                    },
+                },
+              "400": { "description": "Invalid input" },
+              "401": { "description": "Unauthenticated" },
+              "403": { "description": "Forbidden" },
+              "409": { "description": "Conflict" },
+            },
+        },
+    }
+  /barbers/me/services/{id}:
+    {
+      "delete":
+        {
+          "operationId": "archiveService",
+          "security": [{ "bearerAuth": [] }],
+          "parameters":
+            [
+              {
+                "name": "id",
+                "in": "path",
+                "required": true,
+                "schema": { "type": "integer" },
+              },
+            ],
+          "responses":
+            {
+              "204": { "description": "Success" },
+              "400": { "description": "Invalid input" },
+              "401": { "description": "Unauthenticated" },
+              "403": { "description": "Forbidden" },
+              "409": { "description": "Conflict" },
+            },
+        },
+      "patch":
+        {
+          "operationId": "updateService",
+          "security": [{ "bearerAuth": [] }],
+          "parameters":
+            [
+              {
+                "name": "id",
+                "in": "path",
+                "required": true,
+                "schema": { "type": "integer" },
+              },
+            ],
+          "requestBody":
+            {
+              "required": true,
+              "content":
+                {
+                  "application/json":
+                    {
+                      "schema":
+                        {
+                          "type": "object",
+                          "properties":
+                            {
+                              "name": { "type": "string" },
+                              "description": { "type": "string" },
+                              "priceKurus": { "type": "integer" },
+                              "durationMinutes": { "type": "integer" },
+                              "bufferMinutes": { "type": "integer" },
+                            },
+                          "required": ["name", "priceKurus", "durationMinutes"],
+                        },
+                    },
+                },
+            },
+          "responses":
+            {
+              "200":
+                {
+                  "description": "Success",
+                  "content":
+                    {
+                      "application/json":
+                        {
+                          "schema":
+                            {
+                              "type": "object",
+                              "properties":
+                                {
+                                  "id": { "type": "integer" },
+                                  "barberId": { "type": "integer" },
+                                  "name": { "type": "string" },
+                                  "description": { "type": "string" },
+                                  "priceKurus": { "type": "integer" },
+                                  "durationMinutes": { "type": "integer" },
+                                  "bufferMinutes": { "type": "integer" },
+                                  "isActive": { "type": "boolean" },
+                                },
+                              "required":
+                                [
+                                  "id",
+                                  "barberId",
+                                  "name",
+                                  "description",
+                                  "priceKurus",
+                                  "durationMinutes",
+                                  "bufferMinutes",
+                                  "isActive",
+                                ],
+                            },
+                        },
+                    },
+                },
+              "400": { "description": "Invalid input" },
+              "401": { "description": "Unauthenticated" },
+              "403": { "description": "Forbidden" },
+              "409": { "description": "Conflict" },
+            },
+        },
+    }
+  /barbers/me/access:
+    {
+      "get":
+        {
+          "operationId": "getBarberAccess",
+          "security": [{ "bearerAuth": [] }],
+          "parameters": [],
+          "responses":
+            {
+              "200":
+                {
+                  "description": "Success",
+                  "content":
+                    {
+                      "application/json":
+                        {
+                          "schema":
+                            {
+                              "type": "object",
+                              "properties":
+                                {
+                                  "barberId": { "type": "integer" },
+                                  "code": { "type": "string" },
+                                },
+                              "required": ["barberId", "code"],
+                            },
+                        },
+                    },
+                },
+              "400": { "description": "Invalid input" },
+              "401": { "description": "Unauthenticated" },
+              "403": { "description": "Forbidden" },
+              "409": { "description": "Conflict" },
+            },
+        },
+    }
+  /customers/me/barbers/join:
+    {
+      "post":
+        {
+          "operationId": "joinBarber",
+          "security": [{ "bearerAuth": [] }],
+          "parameters": [],
+          "requestBody":
+            {
+              "required": true,
+              "content":
+                {
+                  "application/json":
+                    {
+                      "schema":
+                        {
+                          "type": "object",
+                          "properties": { "code": { "type": "string" } },
+                          "required": ["code"],
+                        },
+                    },
+                },
+            },
+          "responses":
+            {
+              "200":
+                {
+                  "description": "Success",
+                  "content":
+                    {
+                      "application/json":
+                        {
+                          "schema":
+                            {
+                              "type": "object",
+                              "properties":
+                                { "barberId": { "type": "integer" } },
+                              "required": ["barberId"],
+                            },
+                        },
+                    },
+                },
+              "400": { "description": "Invalid input" },
+              "401": { "description": "Unauthenticated" },
+              "403": { "description": "Forbidden" },
+              "409": { "description": "Conflict" },
+            },
+        },
+    }
+  /customers/me/barbers:
+    {
+      "get":
+        {
+          "operationId": "listMyBarbers",
+          "security": [{ "bearerAuth": [] }],
+          "parameters": [],
+          "responses":
+            {
+              "200":
+                {
+                  "description": "Success",
+                  "content":
+                    {
+                      "application/json":
+                        {
+                          "schema":
+                            {
+                              "type": "array",
+                              "items":
+                                {
+                                  "type": "object",
+                                  "properties":
+                                    {
+                                      "id": { "type": "integer" },
+                                      "shopName": { "type": "string" },
+                                      "shopAddress":
+                                        { "type": "string", "nullable": true },
+                                    },
+                                  "required": ["id", "shopName"],
+                                },
+                            },
+                        },
+                    },
+                },
+              "400": { "description": "Invalid input" },
+              "401": { "description": "Unauthenticated" },
+              "403": { "description": "Forbidden" },
+              "409": { "description": "Conflict" },
+            },
+        },
+    }
+  /barbers/me/customers:
+    {
+      "get":
+        {
+          "operationId": "listBarberCustomers",
+          "security": [{ "bearerAuth": [] }],
+          "parameters": [],
+          "responses":
+            {
+              "200":
+                {
+                  "description": "Success",
+                  "content":
+                    {
+                      "application/json":
+                        {
+                          "schema":
+                            {
+                              "type": "array",
+                              "items":
+                                {
+                                  "type": "object",
+                                  "properties":
+                                    {
+                                      "id": { "type": "integer" },
+                                      "customerId": { "type": "integer" },
+                                      "name": { "type": "string" },
+                                      "phone":
+                                        { "type": "string", "nullable": true },
+                                      "privateNotes": { "type": "string" },
+                                      "tags": { "type": "string" },
+                                      "visits": { "type": "integer" },
+                                      "noShows": { "type": "integer" },
+                                      "lastVisit":
+                                        { "type": "string", "nullable": true },
+                                    },
+                                  "required":
+                                    [
+                                      "id",
+                                      "customerId",
+                                      "name",
+                                      "privateNotes",
+                                      "tags",
+                                      "visits",
+                                      "noShows",
+                                    ],
+                                },
+                            },
+                        },
+                    },
+                },
+              "400": { "description": "Invalid input" },
+              "401": { "description": "Unauthenticated" },
+              "403": { "description": "Forbidden" },
+              "409": { "description": "Conflict" },
+            },
+        },
+    }
+  /barbers/me/customers/{id}:
+    {
+      "patch":
+        {
+          "operationId": "updateBarberCustomer",
+          "security": [{ "bearerAuth": [] }],
+          "parameters":
+            [
+              {
+                "name": "id",
+                "in": "path",
+                "required": true,
+                "schema": { "type": "integer" },
+              },
+            ],
+          "requestBody":
+            {
+              "required": true,
+              "content":
+                {
+                  "application/json":
+                    {
+                      "schema":
+                        {
+                          "type": "object",
+                          "properties":
+                            {
+                              "privateNotes": { "type": "string" },
+                              "tags": { "type": "string" },
+                            },
+                          "required": ["privateNotes", "tags"],
+                        },
+                    },
+                },
+            },
+          "responses":
+            {
+              "200":
+                {
+                  "description": "Success",
+                  "content":
+                    {
+                      "application/json":
+                        {
+                          "schema":
+                            {
+                              "type": "object",
+                              "properties": { "id": { "type": "integer" } },
+                              "required": ["id"],
+                            },
+                        },
+                    },
+                },
+              "400": { "description": "Invalid input" },
+              "401": { "description": "Unauthenticated" },
+              "403": { "description": "Forbidden" },
+              "409": { "description": "Conflict" },
+            },
+        },
+    }
+  /barbers/me/exceptions:
+    {
+      "get":
+        {
+          "operationId": "listCalendarExceptions",
+          "security": [{ "bearerAuth": [] }],
+          "parameters": [],
+          "responses":
+            {
+              "200":
+                {
+                  "description": "Success",
+                  "content":
+                    {
+                      "application/json":
+                        {
+                          "schema":
+                            {
+                              "type": "array",
+                              "items":
+                                {
+                                  "type": "object",
+                                  "properties":
+                                    {
+                                      "id": { "type": "integer" },
+                                      "barberId": { "type": "integer" },
+                                      "date": { "type": "string" },
+                                      "startTime": { "type": "string" },
+                                      "endTime": { "type": "string" },
+                                      "reason": { "type": "string" },
+                                    },
+                                  "required":
+                                    [
+                                      "id",
+                                      "barberId",
+                                      "date",
+                                      "startTime",
+                                      "endTime",
+                                      "reason",
+                                    ],
+                                },
+                            },
+                        },
+                    },
+                },
+              "400": { "description": "Invalid input" },
+              "401": { "description": "Unauthenticated" },
+              "403": { "description": "Forbidden" },
+              "409": { "description": "Conflict" },
+            },
+        },
+      "post":
+        {
+          "operationId": "createCalendarException",
+          "security": [{ "bearerAuth": [] }],
+          "parameters": [],
+          "requestBody":
+            {
+              "required": true,
+              "content":
+                {
+                  "application/json":
+                    {
+                      "schema":
+                        {
+                          "type": "object",
+                          "properties":
+                            {
+                              "date": { "type": "string" },
+                              "startTime": { "type": "string" },
+                              "endTime": { "type": "string" },
+                              "reason": { "type": "string" },
+                              "endDate": { "type": "string" },
+                            },
+                          "required": ["date"],
+                        },
+                    },
+                },
+            },
+          "responses":
+            {
+              "201":
+                {
+                  "description": "Success",
+                  "content":
+                    {
+                      "application/json":
+                        {
+                          "schema":
+                            {
+                              "type": "object",
+                              "properties":
+                                {
+                                  "id": { "type": "integer" },
+                                  "barberId": { "type": "integer" },
+                                  "date": { "type": "string" },
+                                  "startTime": { "type": "string" },
+                                  "endTime": { "type": "string" },
+                                  "reason": { "type": "string" },
+                                },
+                              "required":
+                                [
+                                  "id",
+                                  "barberId",
+                                  "date",
+                                  "startTime",
+                                  "endTime",
+                                  "reason",
+                                ],
+                            },
+                        },
+                    },
+                },
+              "400": { "description": "Invalid input" },
+              "401": { "description": "Unauthenticated" },
+              "403": { "description": "Forbidden" },
+              "409": { "description": "Conflict" },
+            },
+        },
+    }
+  /barbers/me/exceptions/{id}:
+    {
+      "delete":
+        {
+          "operationId": "deleteCalendarException",
+          "security": [{ "bearerAuth": [] }],
+          "parameters":
+            [
+              {
+                "name": "id",
+                "in": "path",
+                "required": true,
+                "schema": { "type": "integer" },
+              },
+            ],
+          "responses":
+            {
+              "204": { "description": "Success" },
+              "400": { "description": "Invalid input" },
+              "401": { "description": "Unauthenticated" },
+              "403": { "description": "Forbidden" },
+              "409": { "description": "Conflict" },
+            },
+        },
+    }
   /healthz:
     get:
       operationId: healthCheck
@@ -1272,6 +2549,15 @@ components:
     Appointment:
       type: object
       properties:
+        serviceName:
+          type: string
+          nullable: true
+        priceKurus:
+          type: integer
+          nullable: true
+        durationMinutes:
+          type: integer
+          nullable: true
         id:
           type: integer
         slotId:
@@ -1325,6 +2611,8 @@ components:
     CreateAppointmentRequest:
       type: object
       properties:
+        serviceId:
+          type: integer
         slotId:
           type: integer
         notes:

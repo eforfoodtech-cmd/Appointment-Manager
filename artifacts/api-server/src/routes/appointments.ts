@@ -11,12 +11,15 @@ import {
   customersTable,
   usersTable,
   noShowBlocksTable,
+  servicesTable,
+  barberCustomersTable,
 } from "@workspace/db";
 import { eq, and, sql, inArray } from "drizzle-orm";
 import { authenticate, type AuthRequest } from "../middlewares/auth";
 import {
   scheduleAppointmentReminders,
   cancelAppointmentReminders,
+  notifyAppointmentEvent,
 } from "../lib/notifications";
 
 const router = Router();
@@ -38,7 +41,9 @@ function timeToMinutes(value: string): number {
 }
 
 function getNowInIstanbul(): { date: string; minutesOfDay: number } {
-  const str = new Date().toLocaleString("sv-SE", { timeZone: "Europe/Istanbul" });
+  const str = new Date().toLocaleString("sv-SE", {
+    timeZone: "Europe/Istanbul",
+  });
   const [datePart, timePart] = str.split(" ");
   const [hStr, mStr] = (timePart ?? "00:00").split(":");
   return {
@@ -83,6 +88,9 @@ async function getAppointmentById(id: number) {
       customerId: appointmentsTable.customerId,
       status: appointmentsTable.status,
       notes: appointmentsTable.notes,
+      serviceName: appointmentsTable.serviceName,
+      priceKurus: appointmentsTable.priceKurus,
+      durationMinutes: appointmentsTable.durationMinutes,
       createdAt: appointmentsTable.createdAt,
       date: appointmentSlotsTable.date,
       startTime: appointmentSlotsTable.startTime,
@@ -223,6 +231,7 @@ router.post("/", authenticate, async (req: AuthRequest, res) => {
     notes,
     customerId: manualCustomerId,
     manualCustomerName: manualNameRaw,
+    serviceId,
   } = req.body;
 
   if (!slotId) {
@@ -250,6 +259,67 @@ router.post("/", authenticate, async (req: AuthRequest, res) => {
 
     if (!slot) return { status: 404 as const, error: "Slot bulunamadı" };
 
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(${slot.barberId})`);
+    const [activeBarber] = await tx
+      .select()
+      .from(barbersTable)
+      .where(
+        and(
+          eq(barbersTable.id, slot.barberId),
+          eq(barbersTable.isActive, true),
+        ),
+      );
+    if (!activeBarber)
+      return {
+        status: 409 as const,
+        error: "Bu berber artık randevu kabul etmiyor.",
+      };
+    const exceptions = await tx.execute(
+      sql`SELECT id FROM calendar_exceptions WHERE barber_id=${slot.barberId} AND date=${slot.date} AND start_time < ${slot.endTime} AND end_time > ${slot.startTime}`,
+    );
+    if (exceptions.rows.length)
+      return {
+        status: 409 as const,
+        error: "Berber bu saat aralığında kapalı.",
+      };
+    const catalog = await tx
+      .select()
+      .from(servicesTable)
+      .where(
+        and(
+          eq(servicesTable.barberId, slot.barberId),
+          eq(servicesTable.isActive, true),
+        ),
+      );
+    const service = catalog.find((item) => item.id === serviceId);
+    if (
+      (serviceId != null && !service) ||
+      (user.role === "customer" && catalog.length > 0 && !service)
+    ) {
+      return {
+        status: 400 as const,
+        error: "Lütfen geçerli bir hizmet seçin.",
+      };
+    }
+    if (
+      service &&
+      service.durationMinutes + service.bufferMinutes >
+        timeToMinutes(slot.endTime) - timeToMinutes(slot.startTime)
+    ) {
+      return {
+        status: 400 as const,
+        error: "Seçilen saat aralığı bu hizmet için yeterli değil.",
+      };
+    }
+    const overlaps = await tx.execute(
+      sql`SELECT a.id FROM appointments a JOIN appointment_slots s ON s.id=a.slot_id WHERE a.barber_id=${slot.barberId} AND a.status IN ('pending','confirmed') AND s.date=${slot.date} AND s.start_time < ${slot.endTime} AND s.end_time > ${slot.startTime}`,
+    );
+    if (overlaps.rows.length)
+      return {
+        status: 409 as const,
+        error: "Bu saat aralığında başka randevu var.",
+      };
+
     if (!slot.isAvailable || slot.isBooked) {
       return { status: 400 as const, error: "Bu slot müsait değil" };
     }
@@ -262,7 +332,10 @@ router.post("/", authenticate, async (req: AuthRequest, res) => {
         .where(eq(barbersTable.userId, user.id))
         .limit(1);
       if (!b || b.id !== slot.barberId) {
-        return { status: 403 as const, error: "Bu slota randevu ekleyemezsiniz" };
+        return {
+          status: 403 as const,
+          error: "Bu slota randevu ekleyemezsiniz",
+        };
       }
     }
 
@@ -348,6 +421,11 @@ router.post("/", authenticate, async (req: AuthRequest, res) => {
         manualCustomerName: isManualByName ? manualCustomerName : null,
         status: "confirmed",
         notes: notes || null,
+        serviceId: service?.id ?? null,
+        serviceName: service?.name ?? null,
+        priceKurus: service?.priceKurus ?? null,
+        durationMinutes: service?.durationMinutes ?? null,
+        bufferMinutes: service?.bufferMinutes ?? 0,
       })
       .returning();
 
@@ -367,6 +445,20 @@ router.post("/", authenticate, async (req: AuthRequest, res) => {
       throw new Error("Bu slot müsait değil");
     }
 
+    if (customerId != null) {
+      await tx
+        .insert(barberCustomersTable)
+        .values({ barberId: slot.barberId, customerId })
+        .onConflictDoNothing();
+    }
+    await notifyAppointmentEvent(
+      appt.id,
+      slot.barberId,
+      customerId,
+      "Yeni randevu",
+      `${slot.date} ${slot.startTime} için randevu oluşturuldu.`,
+      tx,
+    );
     return { status: 201 as const, appointmentId: appt.id };
   });
 
@@ -443,9 +535,31 @@ router.patch("/:id", authenticate, async (req: AuthRequest, res) => {
       .select()
       .from(appointmentsTable)
       .where(eq(appointmentsTable.id, id))
-      .limit(1);
+      .limit(1)
+      .for("update");
 
     if (!existing) return { status: 404 as const, error: "Randevu bulunamadı" };
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(${existing.barberId})`);
+    if (
+      status &&
+      !["cancelled", "confirmed", "completed", "no_show"].includes(status)
+    )
+      return { status: 400 as const, error: "Geçersiz durum" };
+    if (userRole === "customer" && status && status !== "cancelled")
+      return {
+        status: 403 as const,
+        error: "Bu durum değişikliği için yetkiniz yok.",
+      };
+    if (!["pending", "confirmed"].includes(existing.status))
+      return {
+        status: 409 as const,
+        error: "Kapatılmış randevu değiştirilemez.",
+      };
+    if (newSlotId && status)
+      return {
+        status: 400 as const,
+        error: "Saat ve durum aynı işlemde değiştirilemez.",
+      };
 
     // Ownership check: caller must own this appointment.
     if (userRole === "customer") {
@@ -455,7 +569,10 @@ router.patch("/:id", authenticate, async (req: AuthRequest, res) => {
         .where(eq(customersTable.userId, req.user!.id))
         .limit(1);
       if (!c || c.id !== existing.customerId) {
-        return { status: 403 as const, error: "Bu randevuya erişim yetkiniz yok" };
+        return {
+          status: 403 as const,
+          error: "Bu randevuya erişim yetkiniz yok",
+        };
       }
     } else if (userRole === "barber") {
       const [b] = await tx
@@ -464,12 +581,19 @@ router.patch("/:id", authenticate, async (req: AuthRequest, res) => {
         .where(eq(barbersTable.userId, req.user!.id))
         .limit(1);
       if (!b || b.id !== existing.barberId) {
-        return { status: 403 as const, error: "Bu randevuya erişim yetkiniz yok" };
+        return {
+          status: 403 as const,
+          error: "Bu randevuya erişim yetkiniz yok",
+        };
       }
     }
 
     // Guard: no_show only valid for active appointments
-    if (status === "no_show" && existing.status !== "pending" && existing.status !== "confirmed") {
+    if (
+      status === "no_show" &&
+      existing.status !== "pending" &&
+      existing.status !== "confirmed"
+    ) {
       return { status: 400 as const, error: "Bu randevu zaten kapatılmış" };
     }
 
@@ -478,7 +602,7 @@ router.patch("/:id", authenticate, async (req: AuthRequest, res) => {
     if (notes !== undefined) updates.notes = notes;
 
     // Time-gated transitions: load slot once for no_show / cancelled paths
-    if (status === "no_show" || status === "cancelled") {
+    if (status === "no_show" || status === "cancelled" || newSlotId) {
       const [s] = await tx
         .select({
           date: appointmentSlotsTable.date,
@@ -533,7 +657,7 @@ router.patch("/:id", authenticate, async (req: AuthRequest, res) => {
         }
       }
 
-      if (status === "cancelled" && userRole === "customer") {
+      if ((status === "cancelled" || newSlotId) && userRole === "customer") {
         const diffMin = (slotStartMs - nowMs) / 60000;
         if (diffMin <= 0) {
           return {
@@ -544,7 +668,8 @@ router.patch("/:id", authenticate, async (req: AuthRequest, res) => {
         if (diffMin <= 5 * 60) {
           return {
             status: 400 as const,
-            error: "Randevuya 5 saatten az kaldığı için iptal edemezsiniz.",
+            error:
+              "Randevuya 5 saatten az kaldığı için iptal veya saat değişikliği yapamazsınız.",
           };
         }
       }
@@ -560,6 +685,38 @@ router.patch("/:id", authenticate, async (req: AuthRequest, res) => {
       if (!newSlot || !newSlot.isAvailable || newSlot.isBooked) {
         return { status: 400 as const, error: "Seçilen slot müsait değil" };
       }
+      if (newSlot.barberId !== existing.barberId)
+        return {
+          status: 400 as const,
+          error: "Aynı berberden bir saat seçin.",
+        };
+      if (istanbulToMs(newSlot.date, newSlot.startTime) <= Date.now())
+        return { status: 400 as const, error: "Geçmiş saate taşınamaz." };
+      if (
+        existing.durationMinutes != null &&
+        existing.durationMinutes + existing.bufferMinutes >
+          timeToMinutes(newSlot.endTime) - timeToMinutes(newSlot.startTime)
+      )
+        return {
+          status: 400 as const,
+          error: "Saat aralığı hizmet için yetersiz.",
+        };
+      const conflicts = await tx.execute(
+        sql`SELECT id FROM calendar_exceptions WHERE barber_id=${existing.barberId} AND date=${newSlot.date} AND start_time < ${newSlot.endTime} AND end_time > ${newSlot.startTime}`,
+      );
+      if (conflicts.rows.length)
+        return {
+          status: 409 as const,
+          error: "Berber bu saat aralığında kapalı.",
+        };
+      const overlaps = await tx.execute(
+        sql`SELECT a.id FROM appointments a JOIN appointment_slots s ON s.id=a.slot_id WHERE a.barber_id=${existing.barberId} AND a.id <> ${id} AND a.status IN ('pending','confirmed') AND s.date=${newSlot.date} AND s.start_time < ${newSlot.endTime} AND s.end_time > ${newSlot.startTime}`,
+      );
+      if (overlaps.rows.length)
+        return {
+          status: 409 as const,
+          error: "Bu saat aralığında başka randevu var.",
+        };
 
       const [freedOld] = await tx
         .update(appointmentSlotsTable)
@@ -593,6 +750,7 @@ router.patch("/:id", authenticate, async (req: AuthRequest, res) => {
       }
 
       updates.slotId = newSlotId;
+      await cancelAppointmentReminders(id, tx);
     }
 
     if (status === "cancelled") {
@@ -621,6 +779,19 @@ router.patch("/:id", authenticate, async (req: AuthRequest, res) => {
       .set(updates)
       .where(eq(appointmentsTable.id, id));
 
+    await notifyAppointmentEvent(
+      id,
+      existing.barberId,
+      existing.customerId,
+      newSlotId
+        ? "Randevu saati değişti"
+        : status === "cancelled"
+          ? "Randevu iptal edildi"
+          : "Randevu güncellendi",
+      "Güncel bilgileri randevu detayından görebilirsiniz.",
+      tx,
+    );
+
     return { status: 200 as const };
   });
 
@@ -630,6 +801,20 @@ router.patch("/:id", authenticate, async (req: AuthRequest, res) => {
   }
 
   const enriched = await getAppointmentById(id);
+
+  if (newSlotId && enriched) {
+    try {
+      await scheduleAppointmentReminders({
+        appointmentId: id,
+        customerId: enriched.customerId,
+        date: enriched.date,
+        startTime: enriched.startTime,
+        shopName: enriched.shopName,
+      });
+    } catch (err) {
+      req.log.error({ err }, "Yeni randevu hatırlatması planlanamadı");
+    }
+  }
 
   res.json(enriched);
 });

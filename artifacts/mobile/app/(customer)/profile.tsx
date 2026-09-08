@@ -16,6 +16,11 @@ import { router } from "expo-router";
 import { Feather } from "@expo/vector-icons";
 import { useAuth } from "@/context/AuthContext";
 import colors from "@/constants/colors";
+import {
+  AccountSettings,
+  NotificationInbox,
+} from "@/components/AccountSettings";
+import { SettingsSection } from "@/components/BusinessSettings";
 
 const c = colors.light;
 
@@ -116,6 +121,12 @@ export default function CustomerProfile() {
       </View>
 
       {/* Logout */}
+      <SettingsSection title="Randevu bildirimleri">
+        <NotificationInbox />
+      </SettingsSection>
+      <SettingsSection title="Hesap, fotoğraf ve güvenlik">
+        <AccountSettings />
+      </SettingsSection>
       <TouchableOpacity
         style={styles.logoutBtn}
         onPress={handleLogout}

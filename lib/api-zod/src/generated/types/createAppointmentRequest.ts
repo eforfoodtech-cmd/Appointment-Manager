@@ -7,6 +7,7 @@
  */
 
 export interface CreateAppointmentRequest {
+  serviceId?: number;
   slotId: number;
   notes?: string;
   /** Optional — barber can specify a customer when booking manually */

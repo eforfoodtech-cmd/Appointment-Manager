@@ -8,16 +8,16 @@ import {
   ScrollView,
   Platform,
   ActivityIndicator,
-  Alert,
   type TextInputProps,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { Feather } from "@expo/vector-icons";
 import { useRegister } from "@workspace/api-client-react";
 import { useAuth } from "@/context/AuthContext";
 import { AuthBackgroundTexture } from "@/components/AuthBackgroundTexture";
 import colors from "@/constants/colors";
+import { Alert } from "@/utils/alert";
 import {
   isTurkishMobilePhone,
   sanitizeTurkishMobilePhone,
@@ -28,6 +28,9 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function RegisterScreen() {
   const insets = useSafeAreaInsets();
+  const params = useLocalSearchParams<{ code?: string | string[] }>();
+  const rawCode = Array.isArray(params.code) ? params.code[0] : params.code;
+  const qrCode = /^\d{6}$/.test(rawCode ?? "") ? rawCode : undefined;
   const { setAuth } = useAuth();
   const [role, setRole] = useState<Role>("customer");
   const [firstName, setFirstName] = useState("");
@@ -39,24 +42,35 @@ export default function RegisterScreen() {
   const [authorizedFirstName, setAuthorizedFirstName] = useState("");
   const [authorizedLastName, setAuthorizedLastName] = useState("");
   const [address, setAddress] = useState("");
+  const [registrationError, setRegistrationError] = useState("");
 
   const registerMutation = useRegister({
     mutation: {
       onSuccess: async (data) => {
+        setRegistrationError("");
         await setAuth(data.token, data.user as any);
         if (data.user.role === "barber") {
           router.replace("/(barber)");
+        } else if (qrCode) {
+          router.replace({
+            pathname: "/(customer)/barbers",
+            params: { code: qrCode },
+          });
         } else {
           router.replace("/(customer)");
         }
       },
       onError: (err: any) => {
-        Alert.alert("Hata", err?.data?.error || "Kayıt başarısız");
+        const message = err?.data?.error || "Kayıt başarısız";
+        setRegistrationError(message);
+        Alert.alert("Kayıt tamamlanamadı", message);
       },
     },
   });
 
   const handleRegister = () => {
+    if (registerMutation.isPending) return;
+    setRegistrationError("");
     if (role === "customer" && (!firstName.trim() || !lastName.trim())) {
       Alert.alert("Hata", "Ad ve soyad zorunludur");
       return;
@@ -257,7 +271,9 @@ export default function RegisterScreen() {
             <TextInput
               style={styles.phoneField}
               value={phone}
-              onChangeText={(text) => setPhone(sanitizeTurkishMobilePhone(text))}
+              onChangeText={(text) =>
+                setPhone(sanitizeTurkishMobilePhone(text))
+              }
               placeholder="5551112233"
               placeholderTextColor={c.mutedForeground}
               keyboardType="number-pad"
@@ -277,6 +293,21 @@ export default function RegisterScreen() {
           autoCapitalize="none"
           autoComplete="new-password"
         />
+
+        {registrationError ? (
+          <View style={styles.errorBanner} accessibilityRole="alert">
+            <Feather name="alert-circle" size={18} color={c.destructive} />
+            <View style={styles.errorCopy}>
+              <Text style={styles.errorTitle}>Kayıt tamamlanamadı</Text>
+              <Text style={styles.errorText}>{registrationError}</Text>
+              {registrationError.includes("kullanılıyor") ? (
+                <TouchableOpacity onPress={() => router.replace("/login")}>
+                  <Text style={styles.loginLink}>Giriş yapmaya git</Text>
+                </TouchableOpacity>
+              ) : null}
+            </View>
+          </View>
+        ) : null}
 
         <TouchableOpacity
           style={[
@@ -508,6 +539,36 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 5 },
     elevation: 3,
+  },
+  errorBanner: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+    marginHorizontal: 20,
+    padding: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: c.destructive + "35",
+    backgroundColor: c.destructive + "0D",
+  },
+  errorCopy: { flex: 1, minWidth: 0 },
+  errorTitle: {
+    fontSize: 13,
+    fontFamily: "Inter_700Bold",
+    color: c.destructive,
+  },
+  errorText: {
+    marginTop: 3,
+    fontSize: 12,
+    lineHeight: 17,
+    fontFamily: "Inter_400Regular",
+    color: c.foreground,
+  },
+  loginLink: {
+    marginTop: 7,
+    fontSize: 12,
+    fontFamily: "Inter_700Bold",
+    color: c.primary,
   },
   buttonDisabled: { opacity: 0.7 },
   buttonText: {

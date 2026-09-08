@@ -41,10 +41,6 @@ export function usePushRegistration() {
       registeredForUserRef.current = null;
       return;
     }
-    if (user.role !== "customer") {
-      registeredForUserRef.current = null;
-      return;
-    }
     if (registeredForUserRef.current === user.id) return;
 
     // Mark in-flight for this user to avoid duplicate concurrent attempts.

@@ -8,6 +8,9 @@
 import type { AppointmentStatus } from "./appointmentStatus";
 
 export interface Appointment {
+  serviceName?: string | null;
+  priceKurus?: number | null;
+  durationMinutes?: number | null;
   id: number;
   slotId: number;
   barberId: number;

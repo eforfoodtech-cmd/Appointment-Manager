@@ -8,10 +8,9 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
-  Alert,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { Feather } from "@expo/vector-icons";
 import { useLogin } from "@workspace/api-client-react";
 import { useAuth } from "@/context/AuthContext";
@@ -43,9 +42,13 @@ function normalizeIdentifier(value: string) {
 
 export default function LoginScreen() {
   const insets = useSafeAreaInsets();
+  const params = useLocalSearchParams<{ code?: string | string[] }>();
+  const rawCode = Array.isArray(params.code) ? params.code[0] : params.code;
+  const qrCode = /^\d{6}$/.test(rawCode ?? "") ? rawCode : undefined;
   const { setAuth } = useAuth();
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
 
   const loginMutation = useLogin({
     mutation: {
@@ -53,21 +56,32 @@ export default function LoginScreen() {
         await setAuth(data.token, data.user as any);
         if (data.user.role === "barber") {
           router.replace("/(barber)");
+        } else if (qrCode) {
+          router.replace({
+            pathname: "/(customer)/barbers",
+            params: { code: qrCode },
+          });
         } else {
           router.replace("/(customer)");
         }
       },
       onError: (err: any) => {
-        Alert.alert("Hata", err?.data?.error || "Giriş başarısız");
+        setError(
+          err?.data?.error ||
+            (err instanceof TypeError
+              ? "Sunucuya bağlanılamadı. Bağlantınızı kontrol edip tekrar deneyin."
+              : "Giriş başarısız. Lütfen tekrar deneyin."),
+        );
       },
     },
   });
 
   const handleLogin = () => {
+    if (loginMutation.isPending) return;
+    setError(null);
     const normalizedIdentifier = normalizeIdentifier(identifier);
     if (!normalizedIdentifier) {
-      Alert.alert(
-        "Hata",
+      setError(
         /^\d+$/.test(identifier)
           ? "Telefonu başında 0 olmadan, 5 ile başlayan 10 hane girin"
           : "Geçerli bir e-posta veya telefon numarası girin",
@@ -75,7 +89,7 @@ export default function LoginScreen() {
       return;
     }
     if (password.length < 6 || password.length > 72) {
-      Alert.alert("Hata", "Şifre 6-72 karakter arasında olmalı");
+      setError("Şifre 6-72 karakter arasında olmalı");
       return;
     }
     loginMutation.mutate({
@@ -116,9 +130,10 @@ export default function LoginScreen() {
             <TextInput
               style={styles.input}
               value={identifier}
-              onChangeText={(value) =>
-                setIdentifier(constrainIdentifierInput(value))
-              }
+              onChangeText={(value) => {
+                setIdentifier(constrainIdentifierInput(value));
+                setError(null);
+              }}
               placeholder="ornek@mail.com veya 5551112233"
               placeholderTextColor={colors.light.mutedForeground}
               keyboardType="email-address"
@@ -127,6 +142,9 @@ export default function LoginScreen() {
               autoComplete="username"
               maxLength={EMAIL_MAX_LENGTH}
             />
+            <Text style={styles.inputHint}>
+              Telefonu başında 0 olmadan, 10 hane olarak girin.
+            </Text>
           </View>
 
           <View style={styles.inputGroup}>
@@ -134,14 +152,25 @@ export default function LoginScreen() {
             <TextInput
               style={styles.input}
               value={password}
-              onChangeText={setPassword}
+              onChangeText={(value) => {
+                setPassword(value);
+                setError(null);
+              }}
               placeholder="En az 6 karakter"
               placeholderTextColor={colors.light.mutedForeground}
               secureTextEntry
               maxLength={72}
               autoComplete="password"
+              onSubmitEditing={handleLogin}
+              returnKeyType="go"
             />
           </View>
+
+          {error ? (
+            <Text accessibilityRole="alert" style={styles.errorText}>
+              {error}
+            </Text>
+          ) : null}
 
           <TouchableOpacity
             style={styles.forgotLink}
@@ -168,7 +197,12 @@ export default function LoginScreen() {
 
           <TouchableOpacity
             style={styles.link}
-            onPress={() => router.push("/(auth)/register")}
+            onPress={() =>
+              router.push({
+                pathname: "/(auth)/register",
+                params: qrCode ? { code: qrCode } : {},
+              })
+            }
           >
             <Text style={styles.linkText}>
               Hesabın yok mu? <Text style={styles.linkBold}>Kayıt Ol</Text>
@@ -269,6 +303,14 @@ const styles = StyleSheet.create({
   },
   inputGroup: {
     gap: 6,
+  },
+  inputHint: {
+    fontSize: 12,
+    color: c.mutedForeground,
+  },
+  errorText: {
+    fontSize: 13,
+    color: c.destructive,
   },
   label: {
     fontSize: 13,

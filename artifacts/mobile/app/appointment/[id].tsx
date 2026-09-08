@@ -10,7 +10,6 @@ import {
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
-  Alert,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLocalSearchParams, router } from "expo-router";
@@ -27,15 +26,17 @@ import {
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/context/AuthContext";
 import colors from "@/constants/colors";
+import { Alert } from "@/utils/alert";
+import { RescheduleAppointment } from "@/components/RescheduleAppointment";
 
 const c = colors.light;
 
 const STATUS_LABELS: Record<string, { label: string; color: string }> = {
-  pending:   { label: "Bekliyor",    color: "#F59E0B" },
-  confirmed: { label: "Onaylandı",   color: "#10B981" },
-  cancelled: { label: "İptal",       color: "#EF4444" },
-  completed: { label: "Tamamlandı",  color: "#6366F1" },
-  no_show:   { label: "Gelmedi",     color: "#EF4444" },
+  pending: { label: "Bekliyor", color: "#F59E0B" },
+  confirmed: { label: "Onaylandı", color: "#10B981" },
+  cancelled: { label: "İptal", color: "#EF4444" },
+  completed: { label: "Tamamlandı", color: "#6366F1" },
+  no_show: { label: "Gelmedi", color: "#EF4444" },
 };
 
 /** Navigate back reliably on both web and native. */
@@ -55,9 +56,15 @@ export default function AppointmentDetail() {
   /** Invalidate every query that shows appointment data. */
   const invalidateAll = () => {
     queryClient.invalidateQueries({ queryKey: getListAppointmentsQueryKey() });
-    queryClient.invalidateQueries({ queryKey: getGetAppointmentQueryKey(apptId) });
-    queryClient.invalidateQueries({ queryKey: getGetUpcomingAppointmentsQueryKey() });
-    queryClient.invalidateQueries({ queryKey: getGetBarberDashboardQueryKey({ date: appt!.date }) });
+    queryClient.invalidateQueries({
+      queryKey: getGetAppointmentQueryKey(apptId),
+    });
+    queryClient.invalidateQueries({
+      queryKey: getGetUpcomingAppointmentsQueryKey(),
+    });
+    queryClient.invalidateQueries({
+      queryKey: getGetBarberDashboardQueryKey({ date: appt!.date }),
+    });
     queryClient.invalidateQueries({
       queryKey: getGetBarberSlotsQueryKey(appt!.barberId, { date: appt!.date }),
     });
@@ -79,18 +86,19 @@ export default function AppointmentDetail() {
   const isMutating = update.isPending;
 
   const handleStatusChange = (status: "cancelled" | "no_show") => {
-    const labels: Record<string, { title: string; msg: string; btn: string }> = {
-      cancelled: {
-        title: "Randevuyu İptal Et",
-        msg: "Bu randevuyu iptal etmek istediğine emin misin?",
-        btn: "İptal Et",
-      },
-      no_show: {
-        title: "Gelmedi İşareti",
-        msg: "Müşteri gelmedi olarak işaretlensin mi? (1 ay süreli engel oluşur)",
-        btn: "İşaretle",
-      },
-    };
+    const labels: Record<string, { title: string; msg: string; btn: string }> =
+      {
+        cancelled: {
+          title: "Randevuyu İptal Et",
+          msg: "Bu randevuyu iptal etmek istediğine emin misin?",
+          btn: "İptal Et",
+        },
+        no_show: {
+          title: "Gelmedi İşareti",
+          msg: "Müşteri gelmedi olarak işaretlensin mi? (1 ay süreli engel oluşur)",
+          btn: "İşaretle",
+        },
+      };
 
     const { title, msg, btn } = labels[status]!;
 
@@ -121,10 +129,15 @@ export default function AppointmentDetail() {
     );
   }
 
-  const statusInfo = STATUS_LABELS[appt.status] || { label: appt.status, color: c.mutedForeground };
+  const statusInfo = STATUS_LABELS[appt.status] || {
+    label: appt.status,
+    color: c.mutedForeground,
+  };
   const isBarber = user?.role === "barber";
   const isActive = appt.status === "confirmed" || appt.status === "pending";
-  const slotStartMs = new Date(`${appt.date}T${appt.startTime}:00+03:00`).getTime();
+  const slotStartMs = new Date(
+    `${appt.date}T${appt.startTime}:00+03:00`,
+  ).getTime();
   const minutesToStart = (slotStartMs - Date.now()) / 60000;
   const slotStarted = minutesToStart <= 0;
   const customerCanCancel = minutesToStart > 5 * 60;
@@ -143,8 +156,15 @@ export default function AppointmentDetail() {
       )}
 
       {/* Status badge */}
-      <View style={[styles.statusBanner, { backgroundColor: statusInfo.color + "20" }]}>
-        <View style={[styles.statusDot, { backgroundColor: statusInfo.color }]} />
+      <View
+        style={[
+          styles.statusBanner,
+          { backgroundColor: statusInfo.color + "20" },
+        ]}
+      >
+        <View
+          style={[styles.statusDot, { backgroundColor: statusInfo.color }]}
+        />
         <Text style={[styles.statusText, { color: statusInfo.color }]}>
           {statusInfo.label}
         </Text>
@@ -169,12 +189,25 @@ export default function AppointmentDetail() {
 
       {/* Info rows */}
       <View style={styles.infoCard}>
-        <InfoRow icon="scissors" label="Berber"   value={`${appt.barberName} — ${appt.shopName}`} />
-        <InfoRow icon="user"     label="Müşteri"  value={appt.customerName} />
+        {appt.serviceName && (
+          <InfoRow
+            icon="scissors"
+            label="Hizmet"
+            value={`${appt.serviceName} · ${((appt.priceKurus ?? 0) / 100).toFixed(2)} ₺ · ${appt.durationMinutes ?? 0} dk`}
+          />
+        )}
+        <InfoRow
+          icon="scissors"
+          label="Berber"
+          value={`${appt.barberName} — ${appt.shopName}`}
+        />
+        <InfoRow icon="user" label="Müşteri" value={appt.customerName} />
         {appt.customerPhone && (
           <InfoRow icon="phone" label="Telefon" value={appt.customerPhone} />
         )}
-        {appt.notes && <InfoRow icon="file-text" label="Not" value={appt.notes} />}
+        {appt.notes && (
+          <InfoRow icon="file-text" label="Not" value={appt.notes} />
+        )}
         <InfoRow
           icon="clock"
           label="Oluşturulma"
@@ -183,6 +216,13 @@ export default function AppointmentDetail() {
       </View>
 
       {/* Actions */}
+      {isActive && !slotStarted && (isBarber || customerCanCancel) && (
+        <RescheduleAppointment
+          id={appt.id}
+          barberId={appt.barberId}
+          initialDate={appt.date}
+        />
+      )}
       {isActive && !isMutating && (
         <View style={styles.actions}>
           {isBarber ? (
@@ -220,7 +260,15 @@ export default function AppointmentDetail() {
   );
 }
 
-function InfoRow({ icon, label, value }: { icon: any; label: string; value: string }) {
+function InfoRow({
+  icon,
+  label,
+  value,
+}: {
+  icon: any;
+  label: string;
+  value: string;
+}) {
   return (
     <View style={styles.infoRow}>
       <Feather name={icon} size={16} color={c.primary} />
@@ -245,7 +293,10 @@ function ActionBtn({
 }) {
   return (
     <TouchableOpacity
-      style={[styles.actionBtn, { backgroundColor: color + "15", borderColor: color + "40" }]}
+      style={[
+        styles.actionBtn,
+        { backgroundColor: color + "15", borderColor: color + "40" },
+      ]}
       onPress={onPress}
       activeOpacity={0.7}
     >
@@ -256,8 +307,13 @@ function ActionBtn({
 }
 
 const styles = StyleSheet.create({
-  scroll:   { flex: 1, backgroundColor: c.background },
-  loading:  { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: c.background },
+  scroll: { flex: 1, backgroundColor: c.background },
+  loading: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: c.background,
+  },
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -275,7 +331,11 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  headerTitle: { fontSize: 17, fontFamily: "Inter_600SemiBold", color: c.foreground },
+  headerTitle: {
+    fontSize: 17,
+    fontFamily: "Inter_600SemiBold",
+    color: c.foreground,
+  },
   mutatingBanner: {
     flexDirection: "row",
     alignItems: "center",
@@ -287,7 +347,11 @@ const styles = StyleSheet.create({
     borderRadius: colors.radius,
     backgroundColor: c.primary + "15",
   },
-  mutatingText: { fontSize: 14, fontFamily: "Inter_500Medium", color: c.primary },
+  mutatingText: {
+    fontSize: 14,
+    fontFamily: "Inter_500Medium",
+    color: c.primary,
+  },
   statusBanner: {
     flexDirection: "row",
     alignItems: "center",
@@ -299,7 +363,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: c.border,
   },
-  statusDot:  { width: 10, height: 10, borderRadius: 5 },
+  statusDot: { width: 10, height: 10, borderRadius: 5 },
   statusText: { fontSize: 16, fontFamily: "Inter_700Bold" },
   timeCard: {
     flexDirection: "row",
@@ -318,8 +382,17 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     elevation: 2,
   },
-  timeDate:  { fontSize: 16, fontFamily: "Inter_600SemiBold", color: c.foreground },
-  timeRange: { fontSize: 22, fontFamily: "Inter_700Bold", color: c.primary, marginTop: 2 },
+  timeDate: {
+    fontSize: 16,
+    fontFamily: "Inter_600SemiBold",
+    color: c.foreground,
+  },
+  timeRange: {
+    fontSize: 22,
+    fontFamily: "Inter_700Bold",
+    color: c.primary,
+    marginTop: 2,
+  },
   infoCard: {
     marginHorizontal: 16,
     marginTop: 12,
@@ -342,9 +415,23 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: c.border,
   },
-  infoLabel: { fontSize: 11, fontFamily: "Inter_500Medium", color: c.mutedForeground },
-  infoValue: { fontSize: 14, fontFamily: "Inter_400Regular", color: c.foreground, marginTop: 2 },
-  actions: { flexDirection: "row", marginHorizontal: 16, marginTop: 20, gap: 10 },
+  infoLabel: {
+    fontSize: 11,
+    fontFamily: "Inter_500Medium",
+    color: c.mutedForeground,
+  },
+  infoValue: {
+    fontSize: 14,
+    fontFamily: "Inter_400Regular",
+    color: c.foreground,
+    marginTop: 2,
+  },
+  actions: {
+    flexDirection: "row",
+    marginHorizontal: 16,
+    marginTop: 20,
+    gap: 10,
+  },
   actionBtn: {
     flex: 1,
     alignItems: "center",

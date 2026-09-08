@@ -51,7 +51,9 @@ function normalizeDate(date: string): string | null {
 }
 
 function getNowIstanbul(): { date: string; minutesOfDay: number } {
-  const str = new Date().toLocaleString("sv-SE", { timeZone: "Europe/Istanbul" });
+  const str = new Date().toLocaleString("sv-SE", {
+    timeZone: "Europe/Istanbul",
+  });
   const [datePart, timePart] = str.split(" ");
   const [hStr, mStr] = (timePart ?? "00:00").split(":");
   return {
@@ -75,13 +77,20 @@ function isValidAvailabilityRow(item: {
   isOpen: boolean;
   slotDuration: number;
 }): string | null {
-  if (typeof item.dayOfWeek !== "number" || item.dayOfWeek < 0 || item.dayOfWeek > 6) {
+  if (
+    typeof item.dayOfWeek !== "number" ||
+    item.dayOfWeek < 0 ||
+    item.dayOfWeek > 6
+  ) {
     return `Geçersiz dayOfWeek: ${item.dayOfWeek}. 0–6 arasında olmalı.`;
   }
   if (typeof item.isOpen !== "boolean") {
     return `dayOfWeek ${item.dayOfWeek}: isOpen boolean olmalı.`;
   }
-  if (typeof item.slotDuration !== "number" || !VALID_DURATIONS.includes(item.slotDuration)) {
+  if (
+    typeof item.slotDuration !== "number" ||
+    !VALID_DURATIONS.includes(item.slotDuration)
+  ) {
     return `dayOfWeek ${item.dayOfWeek}: Slot süresi 30, 45, 60 veya 90 dk olmalı.`;
   }
   if (!item.isOpen) return null;
@@ -131,105 +140,131 @@ router.get("/", async (_req, res) => {
 });
 
 // ─── GET /api/barbers/me ──────────────────────────────────────────────────────
-router.get("/me", authenticate, requireBarber, async (req: AuthRequest, res) => {
-  const [barber] = await db
-    .select({
-      id: barbersTable.id,
-      userId: barbersTable.userId,
-      shopName: barbersTable.shopName,
-      shopAddress: barbersTable.shopAddress,
-      bio: barbersTable.bio,
-      isActive: barbersTable.isActive,
-      name: usersTable.name,
-      email: usersTable.email,
-      phone: usersTable.phone,
-    })
-    .from(barbersTable)
-    .innerJoin(usersTable, eq(usersTable.id, barbersTable.userId))
-    .where(eq(barbersTable.userId, req.user!.id))
-    .limit(1);
+router.get(
+  "/me",
+  authenticate,
+  requireBarber,
+  async (req: AuthRequest, res) => {
+    const [barber] = await db
+      .select({
+        id: barbersTable.id,
+        userId: barbersTable.userId,
+        shopName: barbersTable.shopName,
+        shopAddress: barbersTable.shopAddress,
+        bio: barbersTable.bio,
+        isActive: barbersTable.isActive,
+        name: usersTable.name,
+        email: usersTable.email,
+        phone: usersTable.phone,
+      })
+      .from(barbersTable)
+      .innerJoin(usersTable, eq(usersTable.id, barbersTable.userId))
+      .where(eq(barbersTable.userId, req.user!.id))
+      .limit(1);
 
-  if (!barber) {
-    res.status(404).json({ error: "Berber profili bulunamadı" });
-    return;
-  }
+    if (!barber) {
+      res.status(404).json({ error: "Berber profili bulunamadı" });
+      return;
+    }
 
-  res.json(barber);
-});
+    res.json(barber);
+  },
+);
 
 // ─── PUT /api/barbers/me ──────────────────────────────────────────────────────
-router.put("/me", authenticate, requireBarber, async (req: AuthRequest, res) => {
-  const { shopName, shopAddress, bio, phone } = req.body;
+router.put(
+  "/me",
+  authenticate,
+  requireBarber,
+  async (req: AuthRequest, res) => {
+    const { shopName, shopAddress, bio, phone } = req.body;
 
-  let canonicalPhone: string | undefined;
-  if (phone !== undefined) {
-    const parsedPhone = parseCanonicalTurkishPhone(phone);
-    if (!parsedPhone) {
-      res.status(400).json({ error: "Geçerli bir telefon numarası girin." });
-      return;
+    let canonicalPhone: string | undefined;
+    if (phone !== undefined) {
+      const parsedPhone = parseCanonicalTurkishPhone(phone);
+      if (!parsedPhone) {
+        res.status(400).json({ error: "Geçerli bir telefon numarası girin." });
+        return;
+      }
+      canonicalPhone = parsedPhone;
     }
-    canonicalPhone = parsedPhone;
-  }
 
-  const hasBarberUpdates =
-    shopName !== undefined || shopAddress !== undefined || bio !== undefined;
+    const hasBarberUpdates =
+      shopName !== undefined || shopAddress !== undefined || bio !== undefined;
 
-  try {
-    if (hasBarberUpdates || canonicalPhone !== undefined) {
-      await db.transaction(async (tx) => {
-        if (hasBarberUpdates) {
-          await tx
-            .update(barbersTable)
-            .set({
-              ...(shopName !== undefined && { shopName }),
-              ...(shopAddress !== undefined && { shopAddress }),
-              ...(bio !== undefined && { bio }),
-            })
-            .where(eq(barbersTable.userId, req.user!.id));
-        }
-
-        if (canonicalPhone !== undefined) {
-          await tx
-            .update(usersTable)
-            .set({ phone: canonicalPhone })
-            .where(eq(usersTable.id, req.user!.id));
-        }
-      });
+    if (canonicalPhone !== undefined) {
+      const [current] = await db
+        .select({ phone: usersTable.phone })
+        .from(usersTable)
+        .where(eq(usersTable.id, req.user!.id));
+      if (current?.phone !== canonicalPhone) {
+        res
+          .status(400)
+          .json({
+            error:
+              "Telefonunuzu Hesap ve güvenlik bölümünden şifrenizle değiştirin.",
+          });
+        return;
+      }
     }
-  } catch (error) {
-    if (
-      typeof error === "object" &&
-      error !== null &&
-      "code" in error &&
-      error.code === "23505"
-    ) {
-      res
-        .status(409)
-        .json({ error: "Bu telefon numarası zaten kullanılıyor." });
-      return;
+
+    try {
+      if (hasBarberUpdates || canonicalPhone !== undefined) {
+        await db.transaction(async (tx) => {
+          if (hasBarberUpdates) {
+            await tx
+              .update(barbersTable)
+              .set({
+                ...(shopName !== undefined && { shopName }),
+                ...(shopAddress !== undefined && { shopAddress }),
+                ...(bio !== undefined && { bio }),
+              })
+              .where(eq(barbersTable.userId, req.user!.id));
+          }
+
+          if (canonicalPhone !== undefined) {
+            await tx
+              .update(usersTable)
+              .set({ phone: canonicalPhone })
+              .where(eq(usersTable.id, req.user!.id));
+          }
+        });
+      }
+    } catch (error) {
+      if (
+        typeof error === "object" &&
+        error !== null &&
+        "code" in error &&
+        error.code === "23505"
+      ) {
+        res
+          .status(409)
+          .json({ error: "Bu telefon numarası zaten kullanılıyor." });
+        return;
+      }
+      throw error;
     }
-    throw error;
-  }
 
-  const [barber] = await db
-    .select({
-      id: barbersTable.id,
-      userId: barbersTable.userId,
-      shopName: barbersTable.shopName,
-      shopAddress: barbersTable.shopAddress,
-      bio: barbersTable.bio,
-      isActive: barbersTable.isActive,
-      name: usersTable.name,
-      email: usersTable.email,
-      phone: usersTable.phone,
-    })
-    .from(barbersTable)
-    .innerJoin(usersTable, eq(usersTable.id, barbersTable.userId))
-    .where(eq(barbersTable.userId, req.user!.id))
-    .limit(1);
+    const [barber] = await db
+      .select({
+        id: barbersTable.id,
+        userId: barbersTable.userId,
+        shopName: barbersTable.shopName,
+        shopAddress: barbersTable.shopAddress,
+        bio: barbersTable.bio,
+        isActive: barbersTable.isActive,
+        name: usersTable.name,
+        email: usersTable.email,
+        phone: usersTable.phone,
+      })
+      .from(barbersTable)
+      .innerJoin(usersTable, eq(usersTable.id, barbersTable.userId))
+      .where(eq(barbersTable.userId, req.user!.id))
+      .limit(1);
 
-  res.json(barber);
-});
+    res.json(barber);
+  },
+);
 
 // ─── GET /api/barbers/me/availability ────────────────────────────────────────
 router.get(
@@ -299,7 +334,9 @@ router.put(
     }
 
     const inserted = await db.transaction(async (tx) => {
-      await tx.delete(availabilityTable).where(eq(availabilityTable.barberId, barber.id));
+      await tx
+        .delete(availabilityTable)
+        .where(eq(availabilityTable.barberId, barber.id));
       return tx
         .insert(availabilityTable)
         .values(
@@ -345,7 +382,11 @@ router.put(
         continue;
       }
 
-      const slotPairs = generateSlotPairs(tmpl.startTime, tmpl.endTime, tmpl.slotDuration);
+      const slotPairs = generateSlotPairs(
+        tmpl.startTime,
+        tmpl.endTime,
+        tmpl.slotDuration,
+      );
       await syncDaySlots(barber.id, date, slotPairs);
     }
 
@@ -370,9 +411,13 @@ router.get(
       return;
     }
 
-    const date = normalizeDate((req.query["date"] as string) || new Date().toISOString().split("T")[0]);
+    const date = normalizeDate(
+      (req.query["date"] as string) || new Date().toISOString().split("T")[0],
+    );
     if (!date) {
-      res.status(400).json({ error: "date geçersiz. YYYY-MM-DD formatında olmalı." });
+      res
+        .status(400)
+        .json({ error: "date geçersiz. YYYY-MM-DD formatında olmalı." });
       return;
     }
 
@@ -407,10 +452,7 @@ router.get(
         customersTable,
         eq(customersTable.id, appointmentsTable.customerId),
       )
-      .leftJoin(
-        sql`users cu`,
-        sql`cu.id = ${customersTable.userId}`,
-      )
+      .leftJoin(sql`users cu`, sql`cu.id = ${customersTable.userId}`)
       .where(
         and(
           eq(appointmentsTable.barberId, barber.id),
@@ -423,9 +465,13 @@ router.get(
       (a) => a.status === "pending" || a.status === "confirmed",
     );
     const pendingCount = activeAppts.length;
-    const completedCount = todayAppts.filter((a) => a.status === "completed").length;
+    const completedCount = todayAppts.filter(
+      (a) => a.status === "completed",
+    ).length;
     const noShowCount = todayAppts.filter((a) => a.status === "no_show").length;
-    const cancelledCount = todayAppts.filter((a) => a.status === "cancelled").length;
+    const cancelledCount = todayAppts.filter(
+      (a) => a.status === "cancelled",
+    ).length;
 
     const now = new Date().toTimeString().slice(0, 5);
     const nextAppt =
@@ -456,14 +502,14 @@ function generateSlotPairs(
   const [sh, sm] = startTime.split(":").map(Number) as [number, number];
   const [eh, em] = endTime.split(":").map(Number) as [number, number];
   const startMin = sh * 60 + sm;
-  const endMin   = eh * 60 + em;
+  const endMin = eh * 60 + em;
   const pairs: Array<{ startTime: string; endTime: string }> = [];
   for (let t = startMin; t + durationMinutes <= endMin; t += durationMinutes) {
     const s = t;
     const e = t + durationMinutes;
     pairs.push({
       startTime: `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`,
-      endTime:   `${String(Math.floor(e / 60)).padStart(2, "0")}:${String(e % 60).padStart(2, "0")}`,
+      endTime: `${String(Math.floor(e / 60)).padStart(2, "0")}:${String(e % 60).padStart(2, "0")}`,
     });
   }
   return pairs;
@@ -501,13 +547,16 @@ async function syncDaySlots(
     );
 
   // 2. Categorise by appointments linked to each slot
-  const activeSlotIds = new Set<number>();   // pending | confirmed → fully protect
+  const activeSlotIds = new Set<number>(); // pending | confirmed → fully protect
   const fkLinkedSlotIds = new Set<number>(); // cancelled | completed | no_show → FK-blocked
 
   if (allSlots.length > 0) {
     const slotIds = allSlots.map((s) => s.id);
     const appts = await db
-      .select({ slotId: appointmentsTable.slotId, status: appointmentsTable.status })
+      .select({
+        slotId: appointmentsTable.slotId,
+        status: appointmentsTable.status,
+      })
       .from(appointmentsTable)
       .where(inArray(appointmentsTable.slotId, slotIds));
 
@@ -588,7 +637,11 @@ async function syncDaySlots(
   };
 
   const toInsert = slotPairs
-    .filter((p) => !occupiedStartTimes.has(p.startTime) && !overlapsActive(p.startTime, p.endTime))
+    .filter(
+      (p) =>
+        !occupiedStartTimes.has(p.startTime) &&
+        !overlapsActive(p.startTime, p.endTime),
+    )
     .map((p) => ({
       barberId,
       date,
@@ -643,7 +696,10 @@ router.post(
     }
 
     let totalInserted = 0;
-    const summary: Record<string, { inserted: number; deleted: number; closed?: boolean }> = {};
+    const summary: Record<
+      string,
+      { inserted: number; deleted: number; closed?: boolean }
+    > = {};
 
     for (const date of dates) {
       const dayOfWeek = new Date(date + "T12:00:00").getDay();
@@ -655,16 +711,26 @@ router.post(
         if (!tmpl || !tmpl.isOpen) {
           const result = await syncDaySlots(barber.id, date, null);
           summary[date] = { ...result, closed: true };
-          req.log.info({ barberId: barber.id, date, dayOfWeek, ...result }, "seed-week: day closed");
+          req.log.info(
+            { barberId: barber.id, date, dayOfWeek, ...result },
+            "seed-week: day closed",
+          );
           continue;
         }
 
         // Open day → full sync against template
-        const slotPairs = generateSlotPairs(tmpl.startTime, tmpl.endTime, tmpl.slotDuration);
+        const slotPairs = generateSlotPairs(
+          tmpl.startTime,
+          tmpl.endTime,
+          tmpl.slotDuration,
+        );
         const result = await syncDaySlots(barber.id, date, slotPairs);
         totalInserted += result.inserted;
         summary[date] = result;
-        req.log.info({ barberId: barber.id, date, ...result }, "seed-week: synced open day");
+        req.log.info(
+          { barberId: barber.id, date, ...result },
+          "seed-week: synced open day",
+        );
         continue;
       }
 
@@ -682,7 +748,10 @@ router.post(
 
       if (existing.length > 0) {
         summary[date] = { inserted: 0, deleted: 0 };
-        req.log.info({ barberId: barber.id, date }, "seed-week: no template, day has slots, skipped");
+        req.log.info(
+          { barberId: barber.id, date },
+          "seed-week: no template, day has slots, skipped",
+        );
         continue;
       }
 
@@ -691,10 +760,16 @@ router.post(
       const result = await syncDaySlots(barber.id, date, defaultPairs);
       totalInserted += result.inserted;
       summary[date] = result;
-      req.log.info({ barberId: barber.id, date, ...result }, "seed-week: seeded with defaults");
+      req.log.info(
+        { barberId: barber.id, date, ...result },
+        "seed-week: seeded with defaults",
+      );
     }
 
-    req.log.info({ barberId: barber.id, totalInserted }, "seed-week: completed");
+    req.log.info(
+      { barberId: barber.id, totalInserted },
+      "seed-week: completed",
+    );
     res.json({ ok: true, totalInserted, summary });
   },
 );
@@ -723,15 +798,26 @@ router.post(
       return;
     }
     if (!DATE_RE.test(date)) {
-      res.status(400).json({ error: "date geçersiz. YYYY-MM-DD formatında olmalı." });
+      res
+        .status(400)
+        .json({ error: "date geçersiz. YYYY-MM-DD formatında olmalı." });
       return;
     }
     if (!isValidTime(startTime, false)) {
-      res.status(400).json({ error: "startTime geçersiz (ÖR: 09:00). 00:00–23:59 arası olmalı." });
+      res
+        .status(400)
+        .json({
+          error: "startTime geçersiz (ÖR: 09:00). 00:00–23:59 arası olmalı.",
+        });
       return;
     }
     if (!isValidTime(endTime, true)) {
-      res.status(400).json({ error: "endTime geçersiz (ÖR: 10:00 veya 24:00). 00:01–24:00 arası olmalı." });
+      res
+        .status(400)
+        .json({
+          error:
+            "endTime geçersiz (ÖR: 10:00 veya 24:00). 00:01–24:00 arası olmalı.",
+        });
       return;
     }
     if (timeToMinutes(startTime) >= timeToMinutes(endTime)) {
@@ -793,7 +879,9 @@ router.patch(
     const { isAvailable } = req.body;
 
     if (typeof isAvailable !== "boolean") {
-      res.status(400).json({ error: "isAvailable boolean (true/false) olmalı." });
+      res
+        .status(400)
+        .json({ error: "isAvailable boolean (true/false) olmalı." });
       return;
     }
 
@@ -892,11 +980,23 @@ router.delete(
       return;
     }
 
-    // isBooked=false garantili — bağlı cancelled/no_show appointment'ları da temizle (FK safety)
-    await db.transaction(async (tx) => {
-      await tx.delete(appointmentsTable).where(eq(appointmentsTable.slotId, slotId));
-      await tx.delete(appointmentSlotsTable).where(eq(appointmentSlotsTable.id, slotId));
-    });
+    const [history] = await db
+      .select({ id: appointmentsTable.id })
+      .from(appointmentsTable)
+      .where(eq(appointmentsTable.slotId, slotId))
+      .limit(1);
+    if (history) {
+      res
+        .status(409)
+        .json({
+          error:
+            "Randevu geçmişi olan saat silinemez. Saat aralığını kapatabilirsiniz.",
+        });
+      return;
+    }
+    await db
+      .delete(appointmentSlotsTable)
+      .where(eq(appointmentSlotsTable.id, slotId));
 
     res.status(204).send();
   },
@@ -1080,71 +1180,105 @@ router.get("/:barberId", async (req, res) => {
 });
 
 // ─── GET /api/barbers/:barberId/slots ─────────────────────────────────────────
-router.get("/:barberId/slots", async (req, res) => {
-  const barberId = Number(req.params["barberId"]);
-  const date = req.query["date"] as string;
+router.get(
+  "/:barberId/slots",
+  (req, res, next) => {
+    if (req.headers.authorization) {
+      void authenticate(req, res, next);
+    } else {
+      next();
+    }
+  },
+  async (req: AuthRequest, res) => {
+    const barberId = Number(req.params["barberId"]);
+    const date = req.query["date"] as string;
+    const [owner] =
+      req.user?.role === "barber"
+        ? await db
+            .select({ id: barbersTable.id })
+            .from(barbersTable)
+            .where(
+              and(
+                eq(barbersTable.id, barberId),
+                eq(barbersTable.userId, req.user.id),
+              ),
+            )
+        : [];
 
-  if (!date) {
-    res.status(400).json({ error: "date parametresi zorunludur" });
-    return;
-  }
+    if (!date) {
+      res.status(400).json({ error: "date parametresi zorunludur" });
+      return;
+    }
 
-  const rows = await db
-    .select({
-      id: appointmentSlotsTable.id,
-      barberId: appointmentSlotsTable.barberId,
-      date: appointmentSlotsTable.date,
-      startTime: appointmentSlotsTable.startTime,
-      endTime: appointmentSlotsTable.endTime,
-      isAvailable: appointmentSlotsTable.isAvailable,
-      isBooked: appointmentSlotsTable.isBooked,
-      appointmentId: appointmentsTable.id,
-      appointmentNotes: appointmentsTable.notes,
-      appointmentStatus: appointmentsTable.status,
-      appointmentCustomerId: appointmentsTable.customerId,
-      customerName: sql<string>`COALESCE(cu.name, ${appointmentsTable.manualCustomerName}, '')`,
-      customerPhone: sql<string | null>`cu.phone`,
-    })
-    .from(appointmentSlotsTable)
-    .leftJoin(
-      appointmentsTable,
-      and(
-        eq(appointmentsTable.slotId, appointmentSlotsTable.id),
-        sql`${appointmentsTable.status} NOT IN ('cancelled', 'no_show')`,
-      ),
-    )
-    .leftJoin(customersTable, eq(customersTable.id, appointmentsTable.customerId))
-    .leftJoin(sql`users cu`, sql`cu.id = ${customersTable.userId}`)
-    .where(
-      and(
-        eq(appointmentSlotsTable.barberId, barberId),
-        eq(appointmentSlotsTable.date, date),
-      ),
-    )
-    .orderBy(appointmentSlotsTable.startTime);
+    const rows = await db
+      .select({
+        id: appointmentSlotsTable.id,
+        barberId: appointmentSlotsTable.barberId,
+        date: appointmentSlotsTable.date,
+        startTime: appointmentSlotsTable.startTime,
+        endTime: appointmentSlotsTable.endTime,
+        isAvailable: appointmentSlotsTable.isAvailable,
+        isBooked: appointmentSlotsTable.isBooked,
+        appointmentId: appointmentsTable.id,
+        appointmentNotes: appointmentsTable.notes,
+        appointmentStatus: appointmentsTable.status,
+        appointmentCustomerId: appointmentsTable.customerId,
+        customerName: sql<string>`COALESCE(cu.name, ${appointmentsTable.manualCustomerName}, '')`,
+        customerPhone: sql<string | null>`cu.phone`,
+      })
+      .from(appointmentSlotsTable)
+      .leftJoin(
+        appointmentsTable,
+        and(
+          eq(appointmentsTable.slotId, appointmentSlotsTable.id),
+          sql`${appointmentsTable.status} NOT IN ('cancelled', 'no_show')`,
+        ),
+      )
+      .leftJoin(
+        customersTable,
+        eq(customersTable.id, appointmentsTable.customerId),
+      )
+      .leftJoin(sql`users cu`, sql`cu.id = ${customersTable.userId}`)
+      .where(
+        and(
+          eq(appointmentSlotsTable.barberId, barberId),
+          eq(appointmentSlotsTable.date, date),
+        ),
+      )
+      .orderBy(appointmentSlotsTable.startTime);
 
-  const slots = rows.map((r) => ({
-    id: r.id,
-    barberId: r.barberId,
-    date: r.date,
-    startTime: r.startTime,
-    endTime: r.endTime,
-    isAvailable: r.isAvailable,
-    isBooked: r.isBooked,
-    appointment:
-      r.appointmentId != null
-        ? {
-            id: r.appointmentId,
-            notes: r.appointmentNotes,
-            status: r.appointmentStatus,
-            customerName: r.customerName,
-            customerPhone: r.customerPhone,
-            isManual: r.appointmentCustomerId == null,
-          }
-        : null,
-  }));
+    const exceptions = await db.execute(
+      sql`SELECT start_time, end_time FROM calendar_exceptions WHERE barber_id=${barberId} AND date=${date}`,
+    );
+    const slots = rows.map((r) => ({
+      id: r.id,
+      barberId: r.barberId,
+      date: r.date,
+      startTime: r.startTime,
+      endTime: r.endTime,
+      isAvailable:
+        r.isAvailable &&
+        !exceptions.rows.some(
+          (e) =>
+            String(e.start_time) < r.endTime &&
+            String(e.end_time) > r.startTime,
+        ),
+      isBooked: r.isBooked,
+      appointment:
+        owner && r.appointmentId != null
+          ? {
+              id: r.appointmentId,
+              notes: r.appointmentNotes,
+              status: r.appointmentStatus,
+              customerName: r.customerName,
+              customerPhone: r.customerPhone,
+              isManual: r.appointmentCustomerId == null,
+            }
+          : null,
+    }));
 
-  res.json(slots);
-});
+    res.json(slots);
+  },
+);
 
 export default router;

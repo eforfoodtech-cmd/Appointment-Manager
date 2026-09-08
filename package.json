@@ -2,7 +2,10 @@
   "name": "workspace",
   "version": "0.0.0",
   "license": "MIT",
-  "scripts": {},
+  "scripts": {
+    "typecheck:libs": "tsc -b",
+    "typecheck": "pnpm run typecheck:libs && pnpm --filter @workspace/mobile run typecheck && pnpm --filter @workspace/api-server run typecheck"
+  },
   "private": true,
   "devDependencies": {
     "@react-native-community/cli": "latest",

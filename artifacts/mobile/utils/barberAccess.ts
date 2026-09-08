@@ -69,13 +69,18 @@ export function parseBarberAccessCode(
   return null;
 }
 
-export function getBarberQrValue(code: string | number): string {
+export function getBarberQrValue(
+  code: string | number,
+  publicAppUrl = process.env.EXPO_PUBLIC_APP_URL,
+): string {
   const parsedCode = parseBarberAccessCode(code);
   if (!parsedCode) {
     throw new Error("QR kodu için geçerli bir berber kodu gereklidir.");
   }
 
-  return `mobile://barbers?code=${encodeURIComponent(parsedCode)}`;
+  const query = `code=${encodeURIComponent(parsedCode)}`;
+  const baseUrl = publicAppUrl?.trim().replace(/\/+$/, "");
+  return baseUrl ? `${baseUrl}/barbers?${query}` : `mobile://barbers?${query}`;
 }
 
 export function isValidBarberAccessCode(

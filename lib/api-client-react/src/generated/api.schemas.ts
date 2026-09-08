@@ -352,6 +352,9 @@ export const AppointmentStatus = {
 } as const;
 
 export interface Appointment {
+  serviceName?: string | null;
+  priceKurus?: number | null;
+  durationMinutes?: number | null;
   id: number;
   slotId: number;
   barberId: number;
@@ -371,6 +374,7 @@ export interface Appointment {
 }
 
 export interface CreateAppointmentRequest {
+  serviceId?: number;
   slotId: number;
   notes?: string;
   /** Optional — barber can specify a customer when booking manually */
@@ -446,6 +450,227 @@ export interface BarberDashboard {
   todayAppointments: Appointment[];
   nextAppointment?: Appointment | null;
 }
+
+export type GetAccount200 = {
+  name: string;
+  email: string;
+  phone: string | null;
+  avatar: string | null;
+  gallery: string[];
+  emailVerifiedAt: string | null;
+  phoneVerifiedAt: string | null;
+};
+
+export type UpdateAccountBody = {
+  name: string;
+  email: string;
+  phone: string;
+  currentPassword: string;
+};
+
+export type UpdateAccount200 = {
+  ok: boolean;
+};
+
+export type DeleteAccountBody = {
+  currentPassword: string;
+  confirmation: string;
+};
+
+export type DeleteAccount200 = {
+  ok: boolean;
+};
+
+export type SaveAccountMediaBody = {
+  avatar: string | null;
+  gallery: string[];
+};
+
+export type SaveAccountMedia200 = {
+  ok: boolean;
+};
+
+export type GetBarberMedia200 = {
+  avatar: string | null;
+  gallery: string[];
+};
+
+export type ChangeAccountPasswordBody = {
+  currentPassword: string;
+  newPassword: string;
+};
+
+export type ChangeAccountPassword200 = {
+  ok: boolean;
+};
+
+export type LogoutAllSessions200 = {
+  ok: boolean;
+};
+
+export type ListAccountSessions200Item = {
+  id: string;
+  device: string;
+  lastSeenAt: string;
+  current: boolean;
+};
+
+export type RevokeAccountSession200 = {
+  ok: boolean;
+};
+
+export type RequestContactVerificationBodyChannel =
+  (typeof RequestContactVerificationBodyChannel)[keyof typeof RequestContactVerificationBodyChannel];
+
+export const RequestContactVerificationBodyChannel = {
+  email: "email",
+  phone: "phone",
+} as const;
+
+export type RequestContactVerificationBody = {
+  channel: RequestContactVerificationBodyChannel;
+};
+
+export type RequestContactVerification200 = {
+  id: number;
+};
+
+export type ConfirmContactVerificationBody = {
+  id: number;
+  code: string;
+};
+
+export type ConfirmContactVerification200 = {
+  ok: boolean;
+};
+
+export type ListNotifications200Item = {
+  id: number;
+  appointmentId: number | null;
+  title: string;
+  body: string;
+  readAt: string | null;
+  createdAt: string;
+};
+
+export type ReadNotification200 = {
+  ok: boolean;
+};
+
+export type ListServices200Item = {
+  id: number;
+  barberId: number;
+  name: string;
+  description: string;
+  priceKurus: number;
+  durationMinutes: number;
+  bufferMinutes: number;
+  isActive: boolean;
+};
+
+export type CreateServiceBody = {
+  name: string;
+  description?: string;
+  priceKurus: number;
+  durationMinutes: number;
+  bufferMinutes?: number;
+};
+
+export type CreateService201 = {
+  id: number;
+  barberId: number;
+  name: string;
+  description: string;
+  priceKurus: number;
+  durationMinutes: number;
+  bufferMinutes: number;
+  isActive: boolean;
+};
+
+export type UpdateServiceBody = {
+  name: string;
+  description?: string;
+  priceKurus: number;
+  durationMinutes: number;
+  bufferMinutes?: number;
+};
+
+export type UpdateService200 = {
+  id: number;
+  barberId: number;
+  name: string;
+  description: string;
+  priceKurus: number;
+  durationMinutes: number;
+  bufferMinutes: number;
+  isActive: boolean;
+};
+
+export type GetBarberAccess200 = {
+  barberId: number;
+  code: string;
+};
+
+export type JoinBarberBody = {
+  code: string;
+};
+
+export type JoinBarber200 = {
+  barberId: number;
+};
+
+export type ListMyBarbers200Item = {
+  id: number;
+  shopName: string;
+  shopAddress?: string | null;
+};
+
+export type ListBarberCustomers200Item = {
+  id: number;
+  customerId: number;
+  name: string;
+  phone?: string | null;
+  privateNotes: string;
+  tags: string;
+  visits: number;
+  noShows: number;
+  lastVisit?: string | null;
+};
+
+export type UpdateBarberCustomerBody = {
+  privateNotes: string;
+  tags: string;
+};
+
+export type UpdateBarberCustomer200 = {
+  id: number;
+};
+
+export type ListCalendarExceptions200Item = {
+  id: number;
+  barberId: number;
+  date: string;
+  startTime: string;
+  endTime: string;
+  reason: string;
+};
+
+export type CreateCalendarExceptionBody = {
+  date: string;
+  startTime?: string;
+  endTime?: string;
+  reason?: string;
+  endDate?: string;
+};
+
+export type CreateCalendarException201 = {
+  id: number;
+  barberId: number;
+  date: string;
+  startTime: string;
+  endTime: string;
+  reason: string;
+};
 
 export type SeedWeekSlots200Summary = {
   [key: string]: {

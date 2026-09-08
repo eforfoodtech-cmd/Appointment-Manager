@@ -69,7 +69,10 @@ async function run(): Promise<void> {
     )
     .returning();
 
-  logger.info({ count: claimed.length }, "Scheduler: due notifications claimed");
+  logger.info(
+    { count: claimed.length },
+    "Scheduler: due notifications claimed",
+  );
 
   let sent = 0;
   let failed = 0;
@@ -77,9 +80,20 @@ async function run(): Promise<void> {
 
   for (const notification of claimed) {
     try {
+      const [current] = await db
+        .select({ status: scheduledNotificationsTable.status })
+        .from(scheduledNotificationsTable)
+        .where(eq(scheduledNotificationsTable.id, notification.id));
+      if (current?.status !== "processing") {
+        skipped++;
+        continue;
+      }
       // Drop reminders whose appointment is no longer active (cancelled after
       // the claim, completed, or no_show).
-      if (notification.appointmentId != null) {
+      if (
+        notification.appointmentId != null &&
+        notification.type !== "appointment_event"
+      ) {
         const [appt] = await db
           .select({ status: appointmentsTable.status })
           .from(appointmentsTable)
@@ -95,7 +109,11 @@ async function run(): Promise<void> {
         if (!isActive) {
           await db
             .update(scheduledNotificationsTable)
-            .set({ status: "cancelled", cancelledAt: new Date(), updatedAt: new Date() })
+            .set({
+              status: "cancelled",
+              cancelledAt: new Date(),
+              updatedAt: new Date(),
+            })
             .where(
               and(
                 eq(scheduledNotificationsTable.id, notification.id),

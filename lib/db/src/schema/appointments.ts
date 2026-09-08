@@ -21,6 +21,11 @@ export const appointmentsTable = pgTable("appointments", {
   manualCustomerName: text("manual_customer_name"),
   status: appointmentStatusEnum("status").notNull().default("confirmed"),
   notes: text("notes"),
+  serviceId: integer("service_id"),
+  serviceName: text("service_name"),
+  priceKurus: integer("price_kurus"),
+  durationMinutes: integer("duration_minutes"),
+  bufferMinutes: integer("buffer_minutes").notNull().default(0),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });

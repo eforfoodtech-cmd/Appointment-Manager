@@ -10,7 +10,13 @@ import {
   QueryClientProvider,
   focusManager,
 } from "@tanstack/react-query";
-import { Stack, useRouter, usePathname, useSegments } from "expo-router";
+import {
+  Stack,
+  useGlobalSearchParams,
+  useRouter,
+  usePathname,
+  useSegments,
+} from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect, useRef } from "react";
 import { Platform, AppState } from "react-native";
@@ -101,6 +107,7 @@ function AuthGuard() {
   const pathname = usePathname();
   const segments = useSegments();
   const router = useRouter();
+  const params = useGlobalSearchParams<{ code?: string | string[] }>();
 
   useEffect(() => {
     if (isLoading) return;
@@ -113,7 +120,13 @@ function AuthGuard() {
 
     if (!user) {
       if (!isAuthScreen && pathname !== "/login") {
-        router.replace("/login");
+        const rawCode = Array.isArray(params.code)
+          ? params.code[0]
+          : params.code;
+        router.replace({
+          pathname: "/login",
+          params: /^\d{6}$/.test(rawCode ?? "") ? { code: rawCode } : {},
+        });
       }
       return;
     }
@@ -140,7 +153,7 @@ function AuthGuard() {
         router.replace(homePath);
       }
     }
-  }, [user, isLoading, pathname, segments, router]);
+  }, [user, isLoading, pathname, segments, router, params.code]);
 
   return null;
 }

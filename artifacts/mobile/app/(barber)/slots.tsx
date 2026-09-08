@@ -11,7 +11,6 @@ import {
   StyleSheet,
   Modal,
   TextInput,
-  Alert,
   ActivityIndicator,
   Platform,
   FlatList,
@@ -39,6 +38,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { PressableScale } from "@/components/PressableScale";
 import { useToast } from "@/components/Toast";
 import colors from "@/constants/colors";
+import { Alert } from "@/utils/alert";
 import { toTurkishMobileTelUrl } from "@/utils/phone";
 import { formatTimeInput, normalizeTimeInput } from "@/utils/timeInput";
 

@@ -18,11 +18,14 @@ import {
 import { Feather } from "@expo/vector-icons";
 import { router, type Href, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useListBarbers } from "@workspace/api-client-react";
+import {
+  useListBarbers,
+  useListMyBarbers,
+  joinBarber,
+} from "@workspace/api-client-react";
 
 import colors from "@/constants/colors";
 import {
-  getBarberAccessCode,
   isValidBarberAccessCode,
   normalizeBarberAccessCode,
   parseBarberAccessCode,
@@ -42,6 +45,7 @@ export default function BarbersScreen() {
     refetch,
   } = useListBarbers();
   const [accessCode, setAccessCode] = useState("");
+  const myBarbers = useListMyBarbers();
   const [codeError, setCodeError] = useState<string | null>(null);
 
   const sortedBarbers = useMemo(
@@ -71,16 +75,13 @@ export default function BarbersScreen() {
     }
 
     handledDeepLinkCode.current = deepLinkCode;
-    const barber = sortedBarbers.find(
-      (item) => getBarberAccessCode(item.id) === deepLinkCode,
-    );
-
-    if (barber) {
-      router.replace(`/book/${barber.id}`);
-      return;
-    }
-
-    setCodeError("QR kodundaki berber artık aktif görünmüyor.");
+    void joinBarber({ code: deepLinkCode })
+      .then((result) => {
+        router.replace(`/book/${result.barberId}`);
+      })
+      .catch((err) =>
+        setCodeError(err?.data?.error || "Berbere bağlanılamadı."),
+      );
   }, [deepLinkCode, isError, isLoading, sortedBarbers]);
 
   const handleCodeChange = (value: string) => {
@@ -88,7 +89,7 @@ export default function BarbersScreen() {
     if (codeError) setCodeError(null);
   };
 
-  const handleFindBarber = () => {
+  const handleFindBarber = async () => {
     Keyboard.dismiss();
 
     if (!isValidBarberAccessCode(accessCode)) {
@@ -106,19 +107,13 @@ export default function BarbersScreen() {
       return;
     }
 
-    // TODO(backend): Replace this local directory lookup with the customer
-    // join/resolve-by-code endpoint so the relationship is persisted.
-    const barber = sortedBarbers.find(
-      (item) => getBarberAccessCode(item.id) === accessCode,
-    );
-
-    if (!barber) {
-      setCodeError("Bu kodla eşleşen aktif bir berber bulunamadı.");
-      return;
+    try {
+      const result = await joinBarber({ code: accessCode });
+      setCodeError(null);
+      router.push(`/book/${result.barberId}`);
+    } catch (err: any) {
+      setCodeError(err?.data?.error || "Berbere bağlanılamadı.");
     }
-
-    setCodeError(null);
-    router.push(`/book/${barber.id}`);
   };
 
   const paddingTop = insets.top + (Platform.OS === "web" ? 67 : 0);
@@ -262,6 +257,24 @@ export default function BarbersScreen() {
               </TouchableOpacity>
             </View>
 
+            <View style={styles.directoryHeading}>
+              {myBarbers.data?.length ? (
+                <View style={{ gap: 8, flex: 1 }}>
+                  <Text style={styles.directoryTitle}>
+                    Bağlı olduğun berberler
+                  </Text>
+                  {myBarbers.data.map((item) => (
+                    <TouchableOpacity
+                      key={item.id}
+                      style={styles.barberCard}
+                      onPress={() => router.push(`/book/${item.id}`)}
+                    >
+                      <Text style={styles.shopName}>{item.shopName}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              ) : null}
+            </View>
             <View style={styles.directoryHeading}>
               <View>
                 <Text style={styles.directoryEyebrow}>KEŞFET</Text>

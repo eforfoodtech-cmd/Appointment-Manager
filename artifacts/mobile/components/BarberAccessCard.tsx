@@ -14,7 +14,8 @@ import { Feather } from "@expo/vector-icons";
 import QRCode from "react-native-qrcode-svg";
 
 import colors from "@/constants/colors";
-import { getBarberAccessCode, getBarberQrValue } from "@/utils/barberAccess";
+import { getBarberQrValue } from "@/utils/barberAccess";
+import { useGetBarberAccess } from "@workspace/api-client-react";
 
 const c = colors.light;
 
@@ -31,8 +32,9 @@ export function BarberAccessCard({
 }: BarberAccessCardProps) {
   const { width } = useWindowDimensions();
   const isCompact = width < 370;
-  const code = useMemo(() => getBarberAccessCode(barberId), [barberId]);
-  const qrValue = useMemo(() => getBarberQrValue(code), [code]);
+  const access = useGetBarberAccess();
+  const code = access.data?.code ?? "";
+  const qrValue = useMemo(() => (code ? getBarberQrValue(code) : ""), [code]);
   const displayedCode = `${code.slice(0, 3)} ${code.slice(3)}`;
 
   const handleShare = useCallback(async () => {
@@ -52,6 +54,20 @@ export function BarberAccessCard({
       );
     }
   }, [code, qrValue, shopName]);
+
+  if (!code)
+    return (
+      <View style={styles.card}>
+        <Text>
+          {access.isError
+            ? "Berber kodu yüklenemedi."
+            : "Berber kodu hazırlanıyor…"}
+        </Text>
+        <TouchableOpacity onPress={() => access.refetch()}>
+          <Text>Yeniden dene</Text>
+        </TouchableOpacity>
+      </View>
+    );
 
   return (
     <View style={[styles.card, style]}>
@@ -89,9 +105,9 @@ export function BarberAccessCard({
         >
           <QRCode
             value={qrValue}
-            size={116}
-            quietZone={8}
-            color={c.primary}
+            size={132}
+            quietZone={12}
+            color="#000000"
             backgroundColor="#FFFFFF"
           />
         </View>
@@ -100,7 +116,8 @@ export function BarberAccessCard({
       <View style={styles.noteRow}>
         <Feather name="info" size={14} color="rgba(255,255,255,0.72)" />
         <Text style={styles.note}>
-          QR kodu taratıldığında aynı berber kodu uygulamada açılır.
+          QR kodu, müşteriyi Berberini Bul ekranına yönlendirir; bu kodu
+          otomatik işler ve randevu sayfasını açar.
         </Text>
       </View>
 

@@ -11,7 +11,6 @@ import {
   StyleSheet,
   TextInput,
   ActivityIndicator,
-  Alert,
   Platform,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -34,6 +33,15 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/components/Toast";
 import colors from "@/constants/colors";
+import { Alert } from "@/utils/alert";
+import {
+  BusinessSettings,
+  SettingsSection,
+} from "@/components/BusinessSettings";
+import {
+  AccountSettings,
+  NotificationInbox,
+} from "@/components/AccountSettings";
 import {
   isTurkishMobilePhone,
   sanitizeTurkishMobilePhone,
@@ -115,6 +123,7 @@ export default function BarberProfile() {
   const seedWeek = useSeedWeekSlots();
   const [editMode, setEditMode] = useState(false);
   const [scheduleEditing, setScheduleEditing] = useState(false);
+  const [scheduleExpanded, setScheduleExpanded] = useState(false);
 
   const { data: profile, isLoading } = useGetMyBarberProfile();
   const { data: blocks } = useListBlocks();
@@ -217,10 +226,7 @@ export default function BarberProfile() {
       return;
     }
     if (phone && !isTurkishMobilePhone(phone)) {
-      Alert.alert(
-        "Hata",
-        "Telefon numarası 5 ile başlayan 10 haneli olmalı",
-      );
+      Alert.alert("Hata", "Telefon numarası 5 ile başlayan 10 haneli olmalı");
       return;
     }
     updateProfile.mutate({
@@ -442,80 +448,111 @@ export default function BarberProfile() {
         {/* Weekly Schedule Template */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Haftalık Program</Text>
             <TouchableOpacity
-              style={[
-                styles.scheduleEditBtn,
-                scheduleEditing && styles.scheduleEditBtnActive,
-              ]}
-              onPress={() =>
-                scheduleEditing
-                  ? handleSaveSchedule()
-                  : setScheduleEditing(true)
-              }
-              activeOpacity={0.8}
+              style={styles.sectionToggle}
+              onPress={() => setScheduleExpanded((value) => !value)}
+              activeOpacity={0.75}
             >
-              {setAvailability.isPending ? (
-                <ActivityIndicator
-                  color={scheduleEditing ? "#fff" : c.primary}
-                  size="small"
-                />
-              ) : (
-                <Text
-                  style={[
-                    styles.scheduleEditBtnText,
-                    scheduleEditing && styles.scheduleEditBtnTextActive,
-                  ]}
-                >
-                  {scheduleEditing ? "Kaydet" : "Düzenle"}
+              <View style={styles.sectionToggleCopy}>
+                <Text style={[styles.sectionTitle, styles.sectionTitleTight]}>
+                  Haftalık Program
                 </Text>
-              )}
+                <Text style={styles.sectionToggleSubtitle}>
+                  {schedule.filter((row) => row.isOpen).length} açık gün
+                </Text>
+              </View>
+              <Feather
+                name={scheduleExpanded ? "chevron-up" : "chevron-down"}
+                size={20}
+                color={c.mutedForeground}
+              />
             </TouchableOpacity>
+            {scheduleExpanded ? (
+              <TouchableOpacity
+                style={[
+                  styles.scheduleEditBtn,
+                  scheduleEditing && styles.scheduleEditBtnActive,
+                ]}
+                onPress={() =>
+                  scheduleEditing
+                    ? handleSaveSchedule()
+                    : setScheduleEditing(true)
+                }
+                activeOpacity={0.8}
+              >
+                {setAvailability.isPending ? (
+                  <ActivityIndicator
+                    color={scheduleEditing ? "#fff" : c.primary}
+                    size="small"
+                  />
+                ) : (
+                  <Text
+                    style={[
+                      styles.scheduleEditBtnText,
+                      scheduleEditing && styles.scheduleEditBtnTextActive,
+                    ]}
+                  >
+                    {scheduleEditing ? "Kaydet" : "Düzenle"}
+                  </Text>
+                )}
+              </TouchableOpacity>
+            ) : null}
           </View>
 
-          <Text style={styles.scheduleHint}>
-            Bu program haftalık otomatik takvim oluşturmak için kullanılır.
-          </Text>
+          {scheduleExpanded ? (
+            <>
+              <Text style={styles.scheduleHint}>
+                Bu program haftalık otomatik takvim oluşturmak için kullanılır.
+              </Text>
 
-          {schedule.map((row) => (
-            <DayScheduleRow
-              key={row.dayOfWeek}
-              row={row}
-              editing={scheduleEditing}
-              onUpdate={(patch) => updateDay(row.dayOfWeek, patch)}
-            />
-          ))}
+              {schedule.map((row) => (
+                <DayScheduleRow
+                  key={row.dayOfWeek}
+                  row={row}
+                  editing={scheduleEditing}
+                  onUpdate={(patch) => updateDay(row.dayOfWeek, patch)}
+                />
+              ))}
 
-          {scheduleEditing && (
-            <TouchableOpacity
-              style={styles.cancelScheduleBtn}
-              onPress={() => {
-                setScheduleEditing(false);
-                // Revert to server data
-                if (availabilityData && availabilityData.length > 0) {
-                  const map = new Map(
-                    availabilityData.map((a) => [a.dayOfWeek, a]),
-                  );
-                  setSchedule(
-                    [0, 1, 2, 3, 4, 5, 6].map((d) => {
-                      const r = map.get(d);
-                      return r
-                        ? {
-                            dayOfWeek: d,
-                            isOpen: r.isOpen,
-                            startTime: r.startTime,
-                            endTime: r.endTime,
-                            slotDuration: r.slotDuration,
-                          }
-                        : { ...DEFAULT_TEMPLATE[d]! };
-                    }),
-                  );
-                }
-              }}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.cancelScheduleBtnText}>İptal</Text>
-            </TouchableOpacity>
+              {scheduleEditing && (
+                <TouchableOpacity
+                  style={styles.cancelScheduleBtn}
+                  onPress={() => {
+                    setScheduleEditing(false);
+                    // Revert to server data
+                    if (availabilityData && availabilityData.length > 0) {
+                      const map = new Map(
+                        availabilityData.map((a) => [a.dayOfWeek, a]),
+                      );
+                      setSchedule(
+                        [0, 1, 2, 3, 4, 5, 6].map((d) => {
+                          const r = map.get(d);
+                          return r
+                            ? {
+                                dayOfWeek: d,
+                                isOpen: r.isOpen,
+                                startTime: r.startTime,
+                                endTime: r.endTime,
+                                slotDuration: r.slotDuration,
+                              }
+                            : { ...DEFAULT_TEMPLATE[d]! };
+                        }),
+                      );
+                    }
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.cancelScheduleBtnText}>İptal</Text>
+                </TouchableOpacity>
+              )}
+            </>
+          ) : (
+            <View style={styles.scheduleCollapsed}>
+              <Feather name="calendar" size={17} color={c.primary} />
+              <Text style={styles.scheduleCollapsedText}>
+                Günleri ve çalışma saatlerini görmek için bölümü açın.
+              </Text>
+            </View>
           )}
         </View>
 
@@ -562,6 +599,36 @@ export default function BarberProfile() {
           )}
         </View>
 
+        <View style={styles.settingsHeading}>
+          <Text style={styles.settingsEyebrow}>AYARLAR</Text>
+          <Text style={styles.settingsTitle}>Diğer ayarlar</Text>
+          <Text style={styles.settingsSubtitle}>
+            Takvim, bildirim ve hesap seçeneklerini buradan yönetin.
+          </Text>
+        </View>
+        {profile && (
+          <SettingsSection
+            title="İzinler ve kapalı saatler"
+            subtitle="Tatil, mola ve çalışma dışı zamanları düzenleyin"
+            icon="calendar"
+          >
+            <BusinessSettings barberId={profile.id} showServices={false} />
+          </SettingsSection>
+        )}
+        <SettingsSection
+          title="Randevu bildirimleri"
+          subtitle="Yeni ve güncellenen randevuları görüntüleyin"
+          icon="bell"
+        >
+          <NotificationInbox />
+        </SettingsSection>
+        <SettingsSection
+          title="Hesap ve güvenlik"
+          subtitle="Fotoğraflar, iletişim bilgileri, şifre ve oturumlar"
+          icon="shield"
+        >
+          <AccountSettings />
+        </SettingsSection>
         {/* Logout */}
         <TouchableOpacity
           style={styles.logoutBtn}
@@ -898,11 +965,65 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 3 },
     elevation: 1,
   },
+  settingsHeading: {
+    marginHorizontal: 20,
+    marginTop: 4,
+    marginBottom: 12,
+  },
+  settingsEyebrow: {
+    fontSize: 10,
+    fontFamily: "Inter_700Bold",
+    letterSpacing: 1.1,
+    color: c.accent,
+  },
+  settingsTitle: {
+    marginTop: 3,
+    fontSize: 19,
+    fontFamily: "Inter_700Bold",
+    color: c.foreground,
+  },
+  settingsSubtitle: {
+    marginTop: 4,
+    fontSize: 12,
+    lineHeight: 18,
+    fontFamily: "Inter_400Regular",
+    color: c.mutedForeground,
+  },
   sectionHeader: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     marginBottom: 4,
+  },
+  sectionToggle: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    minHeight: 40,
+  },
+  sectionToggleCopy: { flex: 1 },
+  sectionToggleSubtitle: {
+    marginTop: 3,
+    fontSize: 11,
+    fontFamily: "Inter_500Medium",
+    color: c.mutedForeground,
+  },
+  scheduleCollapsed: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 9,
+    marginTop: 12,
+    padding: 12,
+    borderRadius: 10,
+    backgroundColor: c.secondary,
+  },
+  scheduleCollapsedText: {
+    flex: 1,
+    fontSize: 12,
+    lineHeight: 17,
+    fontFamily: "Inter_400Regular",
+    color: c.mutedForeground,
   },
   sectionHeaderCompact: {
     flexDirection: "row",

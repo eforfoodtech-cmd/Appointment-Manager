@@ -14,6 +14,7 @@ import { appointmentsTable } from "./appointments";
 export const notificationTypeEnum = pgEnum("notification_type", [
   "reminder_1d",
   "reminder_1h",
+  "appointment_event",
 ]);
 
 export const notificationStatusEnum = pgEnum("notification_status", [

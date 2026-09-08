@@ -22,6 +22,10 @@ function NativeTabLayout() {
         <Icon sf={{ default: "calendar", selected: "calendar" }} />
         <Label>Slotlar</Label>
       </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="services">
+        <Icon sf={{ default: "scissors", selected: "scissors" }} />
+        <Label>Hizmetler</Label>
+      </NativeTabs.Trigger>
       <NativeTabs.Trigger name="profile">
         <Icon sf={{ default: "person", selected: "person.fill" }} />
         <Label>Profil</Label>
@@ -96,6 +100,15 @@ function ClassicTabLayout() {
           title: "Slotlar",
           tabBarIcon: ({ color }) => (
             <Feather name="calendar" size={22} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="services"
+        options={{
+          title: "Hizmetler",
+          tabBarIcon: ({ color }) => (
+            <Feather name="scissors" size={22} color={color} />
           ),
         }}
       />

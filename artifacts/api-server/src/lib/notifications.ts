@@ -5,8 +5,13 @@
  * - Sends notifications through the Expo Push API.
  */
 import { db } from "@workspace/db";
-import { customersTable, scheduledNotificationsTable } from "@workspace/db";
-import { and, eq } from "drizzle-orm";
+import {
+  customersTable,
+  barbersTable,
+  scheduledNotificationsTable,
+  userNotificationsTable,
+} from "@workspace/db";
+import { and, eq, inArray } from "drizzle-orm";
 
 const EXPO_PUSH_URL = "https://exp.host/--/api/v2/push/send";
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
@@ -104,7 +109,11 @@ export async function cancelAppointmentReminders(
     .where(
       and(
         eq(scheduledNotificationsTable.appointmentId, appointmentId),
-        eq(scheduledNotificationsTable.status, "pending"),
+        inArray(scheduledNotificationsTable.status, ["pending", "processing"]),
+        inArray(scheduledNotificationsTable.type, [
+          "reminder_1d",
+          "reminder_1h",
+        ]),
       ),
     );
 }
@@ -113,6 +122,47 @@ export interface ExpoPushMessage {
   to: string;
   title: string;
   body: string;
+}
+
+export async function notifyAppointmentEvent(
+  appointmentId: number,
+  barberId: number,
+  customerId: number | null,
+  title: string,
+  body: string,
+  executor: Pick<typeof db, "select" | "insert"> = db,
+) {
+  const [barber] = await executor
+    .select()
+    .from(barbersTable)
+    .where(eq(barbersTable.id, barberId));
+  const customer = customerId
+    ? (
+        await executor
+          .select()
+          .from(customersTable)
+          .where(eq(customersTable.id, customerId))
+      )[0]
+    : null;
+  const ids = [barber?.userId, customer?.userId].filter(
+    (id): id is number => id != null,
+  );
+  if (!ids.length) return;
+  await executor
+    .insert(userNotificationsTable)
+    .values(ids.map((userId) => ({ userId, appointmentId, title, body })));
+  await executor
+    .insert(scheduledNotificationsTable)
+    .values(
+      ids.map((userId) => ({
+        userId,
+        appointmentId,
+        type: "appointment_event" as const,
+        scheduledFor: new Date(),
+        title,
+        body,
+      })),
+    );
 }
 
 /**

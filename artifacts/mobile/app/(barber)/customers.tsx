@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -19,6 +19,7 @@ import {
 } from "@workspace/api-client-react";
 
 import { BarberAccessCard } from "@/components/BarberAccessCard";
+import { CustomerDirectory } from "@/components/BusinessSettings";
 import colors from "@/constants/colors";
 
 const c = colors.light;
@@ -39,6 +40,8 @@ type CustomerSummary = {
 };
 
 type MutableCustomerSummary = CustomerSummary;
+type CustomerFilter = "all" | "upcoming" | "manual";
+const CUSTOMER_PAGE_SIZE = 20;
 
 function getAppointmentTimestamp(appointment: Appointment): number | null {
   const time =
@@ -143,6 +146,10 @@ function formatAppointmentMoment(timestamp: number): string {
 export default function BarberCustomersScreen() {
   const insets = useSafeAreaInsets();
   const [search, setSearch] = useState("");
+  const [filter, setFilter] = useState<CustomerFilter>("all");
+  const [visibleLimit, setVisibleLimit] = useState(CUSTOMER_PAGE_SIZE);
+  const [showAccessCard, setShowAccessCard] = useState(false);
+  const [showCustomerNotes, setShowCustomerNotes] = useState(false);
 
   const {
     data: profile,
@@ -159,8 +166,8 @@ export default function BarberCustomersScreen() {
     refetch: refetchAppointments,
   } = useListAppointments();
 
-  // TODO(backend): Replace appointment-derived summaries with the dedicated
-  // barber-customer relationship endpoint when it becomes available.
+  // Appointment data keeps manual customers and next-appointment summaries;
+  // persistent CRM notes are loaded only when their collapsed panel is opened.
   const customers = useMemo(
     () => summarizeCustomers(appointments ?? [], Date.now()),
     [appointments],
@@ -168,14 +175,24 @@ export default function BarberCustomersScreen() {
 
   const normalizedSearch = search.trim().toLocaleLowerCase("tr-TR");
   const filteredCustomers = useMemo(() => {
-    if (!normalizedSearch) return customers;
-
     return customers.filter((customer) => {
+      if (filter === "upcoming" && customer.upcomingCount === 0) return false;
+      if (filter === "manual" && !customer.isManual) return false;
+      if (!normalizedSearch) return true;
       const searchableValue =
         `${customer.name} ${customer.phone ?? ""}`.toLocaleLowerCase("tr-TR");
       return searchableValue.includes(normalizedSearch);
     });
-  }, [customers, normalizedSearch]);
+  }, [customers, filter, normalizedSearch]);
+
+  const visibleCustomers = useMemo(
+    () => filteredCustomers.slice(0, visibleLimit),
+    [filteredCustomers, visibleLimit],
+  );
+
+  useEffect(() => {
+    setVisibleLimit(CUSTOMER_PAGE_SIZE);
+  }, [filter, normalizedSearch]);
 
   const upcomingAppointmentCount = useMemo(
     () =>
@@ -249,7 +266,7 @@ export default function BarberCustomersScreen() {
   return (
     <View style={styles.container}>
       <FlatList
-        data={filteredCustomers}
+        data={visibleCustomers}
         keyExtractor={(customer) => customer.key}
         keyboardShouldPersistTaps="handled"
         refreshControl={
@@ -265,7 +282,7 @@ export default function BarberCustomersScreen() {
           {
             paddingTop,
             paddingBottom: insets.bottom + 110,
-            flexGrow: filteredCustomers.length === 0 ? 1 : undefined,
+            flexGrow: visibleCustomers.length === 0 ? 1 : undefined,
           },
         ]}
         ListHeaderComponent={
@@ -280,11 +297,60 @@ export default function BarberCustomersScreen() {
               </View>
             </View>
 
-            <BarberAccessCard
-              barberId={profile.id}
-              shopName={profile.shopName}
-              style={styles.accessCard}
-            />
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityState={{ expanded: showAccessCard }}
+              activeOpacity={0.78}
+              onPress={() => setShowAccessCard((value) => !value)}
+              style={styles.accessToggle}
+            >
+              <View style={styles.accessToggleIcon}>
+                <Feather name="user-plus" size={18} color={c.primary} />
+              </View>
+              <View style={styles.accessToggleCopy}>
+                <Text style={styles.accessToggleTitle}>Müşteri davet et</Text>
+                <Text style={styles.accessToggleText}>
+                  Berber kodunu veya QR kodunu paylaş
+                </Text>
+              </View>
+              <Feather
+                name={showAccessCard ? "chevron-up" : "chevron-down"}
+                size={19}
+                color={c.mutedForeground}
+              />
+            </TouchableOpacity>
+            {showAccessCard ? (
+              <BarberAccessCard
+                barberId={profile.id}
+                shopName={profile.shopName}
+                style={styles.accessCard}
+              />
+            ) : null}
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityState={{ expanded: showCustomerNotes }}
+              activeOpacity={0.78}
+              onPress={() => setShowCustomerNotes((value) => !value)}
+              style={styles.accessToggle}
+            >
+              <View style={styles.accessToggleIcon}>
+                <Feather name="tag" size={18} color={c.primary} />
+              </View>
+              <View style={styles.accessToggleCopy}>
+                <Text style={styles.accessToggleTitle}>
+                  Notlar ve etiketler
+                </Text>
+                <Text style={styles.accessToggleText}>
+                  Müşterilere özel not ve etiket ekle
+                </Text>
+              </View>
+              <Feather
+                name={showCustomerNotes ? "chevron-up" : "chevron-down"}
+                size={19}
+                color={c.mutedForeground}
+              />
+            </TouchableOpacity>
+            {showCustomerNotes ? <CustomerDirectory /> : null}
 
             <View style={styles.statsRow}>
               <SummaryCard
@@ -326,6 +392,51 @@ export default function BarberCustomersScreen() {
               ) : null}
             </View>
 
+            <View style={styles.filterRow}>
+              {(
+                [
+                  ["all", "Tümü", customers.length],
+                  [
+                    "upcoming",
+                    "Yaklaşan",
+                    customers.filter((item) => item.upcomingCount > 0).length,
+                  ],
+                  [
+                    "manual",
+                    "Manuel",
+                    customers.filter((item) => item.isManual).length,
+                  ],
+                ] as Array<[CustomerFilter, string, number]>
+              ).map(([id, label, count]) => (
+                <TouchableOpacity
+                  key={id}
+                  activeOpacity={0.78}
+                  onPress={() => setFilter(id)}
+                  style={[
+                    styles.filterButton,
+                    filter === id && styles.filterButtonActive,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.filterText,
+                      filter === id && styles.filterTextActive,
+                    ]}
+                  >
+                    {label}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.filterCount,
+                      filter === id && styles.filterCountActive,
+                    ]}
+                  >
+                    {count}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>Müşteri listesi</Text>
               <View style={styles.countBadge}>
@@ -355,6 +466,23 @@ export default function BarberCustomersScreen() {
                 : "İlk randevu oluşturulduğunda müşteri burada görünecek. Manuel randevular da listeye eklenir."}
             </Text>
           </View>
+        }
+        ListFooterComponent={
+          visibleCustomers.length < filteredCustomers.length ? (
+            <TouchableOpacity
+              accessibilityRole="button"
+              activeOpacity={0.8}
+              onPress={() =>
+                setVisibleLimit((value) => value + CUSTOMER_PAGE_SIZE)
+              }
+              style={styles.loadMoreButton}
+            >
+              <Text style={styles.loadMoreText}>Daha fazla müşteri göster</Text>
+              <Text style={styles.loadMoreCount}>
+                {filteredCustomers.length - visibleCustomers.length} kaldı
+              </Text>
+            </TouchableOpacity>
+          ) : null
         }
         renderItem={({ item }) => <CustomerCard customer={item} />}
       />
@@ -483,6 +611,37 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: c.border,
   },
+  accessToggle: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 11,
+    padding: 13,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: c.border,
+    borderRadius: 12,
+    backgroundColor: c.card,
+  },
+  accessToggleIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 11,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: c.secondary,
+  },
+  accessToggleCopy: { flex: 1, minWidth: 0 },
+  accessToggleTitle: {
+    fontSize: 13,
+    fontFamily: "Inter_700Bold",
+    color: c.foreground,
+  },
+  accessToggleText: {
+    marginTop: 2,
+    fontSize: 11,
+    fontFamily: "Inter_400Regular",
+    color: c.mutedForeground,
+  },
   accessCard: {
     marginBottom: 14,
   },
@@ -544,6 +703,41 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: "Inter_400Regular",
   },
+  filterRow: {
+    flexDirection: "row",
+    gap: 7,
+    marginBottom: 18,
+  },
+  filterButton: {
+    flex: 1,
+    minWidth: 0,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 5,
+    paddingHorizontal: 8,
+    paddingVertical: 9,
+    borderWidth: 1,
+    borderColor: c.border,
+    borderRadius: 9,
+    backgroundColor: c.card,
+  },
+  filterButtonActive: { borderColor: c.primary, backgroundColor: c.primary },
+  filterText: {
+    flexShrink: 1,
+    fontSize: 11,
+    fontFamily: "Inter_600SemiBold",
+    color: c.mutedForeground,
+  },
+  filterTextActive: { color: "#fff" },
+  filterCount: {
+    minWidth: 17,
+    textAlign: "center",
+    fontSize: 10,
+    fontFamily: "Inter_700Bold",
+    color: c.primary,
+  },
+  filterCountActive: { color: "rgba(255,255,255,0.8)" },
   sectionHeader: {
     flexDirection: "row",
     alignItems: "center",
@@ -570,6 +764,26 @@ const styles = StyleSheet.create({
     color: c.primary,
     fontSize: 12,
     fontFamily: "Inter_700Bold",
+  },
+  loadMoreButton: {
+    alignItems: "center",
+    gap: 3,
+    marginTop: 14,
+    paddingVertical: 13,
+    borderWidth: 1,
+    borderColor: c.border,
+    borderRadius: 10,
+    backgroundColor: c.card,
+  },
+  loadMoreText: {
+    fontSize: 13,
+    fontFamily: "Inter_700Bold",
+    color: c.primary,
+  },
+  loadMoreCount: {
+    fontSize: 10,
+    fontFamily: "Inter_400Regular",
+    color: c.mutedForeground,
   },
   separator: {
     height: 10,

@@ -7,6 +7,245 @@
  */
 import * as zod from "zod";
 
+export const GetAccountResponse = zod.object({
+  name: zod.string(),
+  email: zod.string(),
+  phone: zod.string().nullable(),
+  avatar: zod.string().nullable(),
+  gallery: zod.array(zod.string()),
+  emailVerifiedAt: zod.string().nullable(),
+  phoneVerifiedAt: zod.string().nullable(),
+});
+
+export const UpdateAccountBody = zod.object({
+  name: zod.string(),
+  email: zod.string(),
+  phone: zod.string(),
+  currentPassword: zod.string(),
+});
+
+export const UpdateAccountResponse = zod.object({
+  ok: zod.boolean(),
+});
+
+export const DeleteAccountBody = zod.object({
+  currentPassword: zod.string(),
+  confirmation: zod.string(),
+});
+
+export const DeleteAccountResponse = zod.object({
+  ok: zod.boolean(),
+});
+
+export const SaveAccountMediaBody = zod.object({
+  avatar: zod.string().nullable(),
+  gallery: zod.array(zod.string()),
+});
+
+export const SaveAccountMediaResponse = zod.object({
+  ok: zod.boolean(),
+});
+
+export const GetBarberMediaParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetBarberMediaResponse = zod.object({
+  avatar: zod.string().nullable(),
+  gallery: zod.array(zod.string()),
+});
+
+export const ChangeAccountPasswordBody = zod.object({
+  currentPassword: zod.string(),
+  newPassword: zod.string(),
+});
+
+export const ChangeAccountPasswordResponse = zod.object({
+  ok: zod.boolean(),
+});
+
+export const LogoutAllSessionsResponse = zod.object({
+  ok: zod.boolean(),
+});
+
+export const ListAccountSessionsResponseItem = zod.object({
+  id: zod.string(),
+  device: zod.string(),
+  lastSeenAt: zod.string(),
+  current: zod.boolean(),
+});
+export const ListAccountSessionsResponse = zod.array(
+  ListAccountSessionsResponseItem,
+);
+
+export const RevokeAccountSessionParams = zod.object({
+  id: zod.coerce.string(),
+});
+
+export const RevokeAccountSessionResponse = zod.object({
+  ok: zod.boolean(),
+});
+
+export const RequestContactVerificationBody = zod.object({
+  channel: zod.enum(["email", "phone"]),
+});
+
+export const RequestContactVerificationResponse = zod.object({
+  id: zod.number(),
+});
+
+export const ConfirmContactVerificationBody = zod.object({
+  id: zod.number(),
+  code: zod.string(),
+});
+
+export const ConfirmContactVerificationResponse = zod.object({
+  ok: zod.boolean(),
+});
+
+export const ListNotificationsResponseItem = zod.object({
+  id: zod.number(),
+  appointmentId: zod.number().nullable(),
+  title: zod.string(),
+  body: zod.string(),
+  readAt: zod.string().nullable(),
+  createdAt: zod.string(),
+});
+export const ListNotificationsResponse = zod.array(
+  ListNotificationsResponseItem,
+);
+
+export const ReadNotificationParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const ReadNotificationResponse = zod.object({
+  ok: zod.boolean(),
+});
+
+export const ListServicesParams = zod.object({
+  barberId: zod.coerce.number(),
+});
+
+export const ListServicesResponseItem = zod.object({
+  id: zod.number(),
+  barberId: zod.number(),
+  name: zod.string(),
+  description: zod.string(),
+  priceKurus: zod.number(),
+  durationMinutes: zod.number(),
+  bufferMinutes: zod.number(),
+  isActive: zod.boolean(),
+});
+export const ListServicesResponse = zod.array(ListServicesResponseItem);
+
+export const CreateServiceBody = zod.object({
+  name: zod.string(),
+  description: zod.string().optional(),
+  priceKurus: zod.number(),
+  durationMinutes: zod.number(),
+  bufferMinutes: zod.number().optional(),
+});
+
+export const ArchiveServiceParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const UpdateServiceParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const UpdateServiceBody = zod.object({
+  name: zod.string(),
+  description: zod.string().optional(),
+  priceKurus: zod.number(),
+  durationMinutes: zod.number(),
+  bufferMinutes: zod.number().optional(),
+});
+
+export const UpdateServiceResponse = zod.object({
+  id: zod.number(),
+  barberId: zod.number(),
+  name: zod.string(),
+  description: zod.string(),
+  priceKurus: zod.number(),
+  durationMinutes: zod.number(),
+  bufferMinutes: zod.number(),
+  isActive: zod.boolean(),
+});
+
+export const GetBarberAccessResponse = zod.object({
+  barberId: zod.number(),
+  code: zod.string(),
+});
+
+export const JoinBarberBody = zod.object({
+  code: zod.string(),
+});
+
+export const JoinBarberResponse = zod.object({
+  barberId: zod.number(),
+});
+
+export const ListMyBarbersResponseItem = zod.object({
+  id: zod.number(),
+  shopName: zod.string(),
+  shopAddress: zod.string().nullish(),
+});
+export const ListMyBarbersResponse = zod.array(ListMyBarbersResponseItem);
+
+export const ListBarberCustomersResponseItem = zod.object({
+  id: zod.number(),
+  customerId: zod.number(),
+  name: zod.string(),
+  phone: zod.string().nullish(),
+  privateNotes: zod.string(),
+  tags: zod.string(),
+  visits: zod.number(),
+  noShows: zod.number(),
+  lastVisit: zod.string().nullish(),
+});
+export const ListBarberCustomersResponse = zod.array(
+  ListBarberCustomersResponseItem,
+);
+
+export const UpdateBarberCustomerParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const UpdateBarberCustomerBody = zod.object({
+  privateNotes: zod.string(),
+  tags: zod.string(),
+});
+
+export const UpdateBarberCustomerResponse = zod.object({
+  id: zod.number(),
+});
+
+export const ListCalendarExceptionsResponseItem = zod.object({
+  id: zod.number(),
+  barberId: zod.number(),
+  date: zod.string(),
+  startTime: zod.string(),
+  endTime: zod.string(),
+  reason: zod.string(),
+});
+export const ListCalendarExceptionsResponse = zod.array(
+  ListCalendarExceptionsResponseItem,
+);
+
+export const CreateCalendarExceptionBody = zod.object({
+  date: zod.string(),
+  startTime: zod.string().optional(),
+  endTime: zod.string().optional(),
+  reason: zod.string().optional(),
+  endDate: zod.string().optional(),
+});
+
+export const DeleteCalendarExceptionParams = zod.object({
+  id: zod.coerce.number(),
+});
+
 /**
  * @summary Health check
  */
@@ -551,6 +790,9 @@ export const ListAppointmentsQueryParams = zod.object({
 });
 
 export const ListAppointmentsResponseItem = zod.object({
+  serviceName: zod.string().nullish(),
+  priceKurus: zod.number().nullish(),
+  durationMinutes: zod.number().nullish(),
   id: zod.number(),
   slotId: zod.number(),
   barberId: zod.number(),
@@ -583,6 +825,7 @@ export const ListAppointmentsResponse = zod.array(ListAppointmentsResponseItem);
  * @summary Book an appointment (customer or barber on behalf)
  */
 export const CreateAppointmentBody = zod.object({
+  serviceId: zod.number().optional(),
   slotId: zod.number(),
   notes: zod.string().optional(),
   customerId: zod
@@ -605,6 +848,9 @@ export const GetAppointmentParams = zod.object({
 });
 
 export const GetAppointmentResponse = zod.object({
+  serviceName: zod.string().nullish(),
+  priceKurus: zod.number().nullish(),
+  durationMinutes: zod.number().nullish(),
   id: zod.number(),
   slotId: zod.number(),
   barberId: zod.number(),
@@ -648,6 +894,9 @@ export const UpdateAppointmentBody = zod.object({
 });
 
 export const UpdateAppointmentResponse = zod.object({
+  serviceName: zod.string().nullish(),
+  priceKurus: zod.number().nullish(),
+  durationMinutes: zod.number().nullish(),
   id: zod.number(),
   slotId: zod.number(),
   barberId: zod.number(),
@@ -755,6 +1004,9 @@ export const GetBarberDashboardResponse = zod.object({
   noShowCount: zod.number(),
   todayAppointments: zod.array(
     zod.object({
+      serviceName: zod.string().nullish(),
+      priceKurus: zod.number().nullish(),
+      durationMinutes: zod.number().nullish(),
       id: zod.number(),
       slotId: zod.number(),
       barberId: zod.number(),
@@ -784,6 +1036,9 @@ export const GetBarberDashboardResponse = zod.object({
   ),
   nextAppointment: zod
     .object({
+      serviceName: zod.string().nullish(),
+      priceKurus: zod.number().nullish(),
+      durationMinutes: zod.number().nullish(),
       id: zod.number(),
       slotId: zod.number(),
       barberId: zod.number(),
@@ -817,6 +1072,9 @@ export const GetBarberDashboardResponse = zod.object({
  * @summary Get customer's upcoming appointments
  */
 export const GetUpcomingAppointmentsResponseItem = zod.object({
+  serviceName: zod.string().nullish(),
+  priceKurus: zod.number().nullish(),
+  durationMinutes: zod.number().nullish(),
   id: zod.number(),
   slotId: zod.number(),
   barberId: zod.number(),

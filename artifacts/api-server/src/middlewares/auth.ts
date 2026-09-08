@@ -1,7 +1,8 @@
 import { type NextFunction, type Request, type Response } from "express";
 import jwt from "jsonwebtoken";
+import { createHash, randomUUID } from "node:crypto";
 import { eq } from "drizzle-orm";
-import { db, usersTable } from "@workspace/db";
+import { db, usersTable, userSessionsTable } from "@workspace/db";
 
 function jwtSecret() {
   if (process.env.SESSION_SECRET) return process.env.SESSION_SECRET;
@@ -26,10 +27,11 @@ export interface AuthUser {
 
 export interface AuthRequest extends Request {
   user?: AuthUser;
+  sessionHash?: string;
 }
 
 export function createToken(user: AuthUser): string {
-  return jwt.sign(user, JWT_SECRET, { expiresIn: "30d" });
+  return jwt.sign(user, JWT_SECRET, { expiresIn: "30d", jwtid: randomUUID() });
 }
 
 export async function authenticate(
@@ -65,6 +67,32 @@ export async function authenticate(
       return;
     }
 
+    const tokenHash = createHash("sha256")
+      .update(authHeader.slice(7))
+      .digest("hex");
+    const exp = (payload as AuthUser & { exp: number }).exp;
+    await db
+      .insert(userSessionsTable)
+      .values({
+        tokenHash,
+        userId: payload.id,
+        device: (req.headers["user-agent"] ?? "Bilinmeyen cihaz").slice(0, 300),
+        expiresAt: new Date(exp * 1000),
+      })
+      .onConflictDoNothing();
+    const [session] = await db
+      .select()
+      .from(userSessionsTable)
+      .where(eq(userSessionsTable.tokenHash, tokenHash));
+    if (session.revoked) {
+      res.status(401).json({ error: "Bu cihazın oturumu kapatılmış." });
+      return;
+    }
+    await db
+      .update(userSessionsTable)
+      .set({ lastSeenAt: new Date() })
+      .where(eq(userSessionsTable.tokenHash, tokenHash));
+    req.sessionHash = tokenHash;
     req.user = payload;
     next();
   } catch (error) {

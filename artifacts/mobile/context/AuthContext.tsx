@@ -11,6 +11,7 @@ import React, {
 } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { setAuthTokenGetter } from "@workspace/api-client-react";
+import { useQueryClient } from "@tanstack/react-query";
 
 const TOKEN_KEY = "tiras_auth_token";
 const USER_KEY = "tiras_auth_user";
@@ -37,6 +38,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | null>(null);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const queryClient = useQueryClient();
   const [user, setUser] = useState<AuthUser | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -75,6 +77,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const logout = useCallback(async () => {
+    await queryClient.cancelQueries();
+    queryClient.clear();
     // Clear React state FIRST so UI re-renders immediately
     setToken(null);
     setUser(null);
@@ -85,7 +89,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch {
       // ignore
     }
-  }, []);
+  }, [queryClient]);
 
   return (
     <AuthContext.Provider value={{ user, token, isLoading, setAuth, logout }}>

@@ -1,5 +1,5 @@
 import { Feather } from "@expo/vector-icons";
-import { useListBarbers } from "@workspace/api-client-react";
+import { useListBarbers, joinBarber } from "@workspace/api-client-react";
 import {
   CameraView,
   type BarcodeScanningResult,
@@ -20,10 +20,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import colors from "@/constants/colors";
-import {
-  getBarberAccessCode,
-  parseBarberAccessCode,
-} from "@/utils/barberAccess";
+import { parseBarberAccessCode } from "@/utils/barberAccess";
 
 const c = colors.light;
 
@@ -154,7 +151,7 @@ export default function ScanBarberQrScreen() {
   };
 
   const handleBarcodeScanned = useCallback(
-    ({ data }: BarcodeScanningResult) => {
+    async ({ data }: BarcodeScanningResult) => {
       if (scanLockedRef.current) return;
 
       scanLockedRef.current = true;
@@ -168,19 +165,14 @@ export default function ScanBarberQrScreen() {
         return;
       }
 
-      // TODO(backend): Resolve and persist the customer-barber relationship
-      // through the same join-by-code endpoint used by manual entry.
-      const barber = (barbers ?? []).find(
-        (item) => getBarberAccessCode(item.id) === accessCode,
-      );
-
-      if (!barber) {
-        setScanError("Bu koda ait aktif bir berber bulunamadı.");
-        return;
+      try {
+        setIsNavigating(true);
+        const result = await joinBarber({ code: accessCode });
+        router.replace(`/book/${result.barberId}`);
+      } catch (err: any) {
+        setIsNavigating(false);
+        setScanError(err?.data?.error || "Berbere bağlanılamadı.");
       }
-
-      setIsNavigating(true);
-      router.replace(`/book/${barber.id}`);
     },
     [barbers],
   );
