@@ -36,6 +36,9 @@ npm-debug.log
 yarn-error.log
 testem.log
 /typings
+/package-lock.json
+/*.msi
+/artifacts/mobile/p0-*.png
 
 # System Files
 .DS_Store
@@ -47,3 +50,5 @@ Thumbs.db
 # Replit
 .cache/
 .local/
+
+tiras.sql

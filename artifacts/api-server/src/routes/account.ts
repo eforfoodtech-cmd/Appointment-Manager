@@ -120,12 +120,10 @@ router.put("/account/media", authenticate, async (req: AuthRequest, res) => {
     !gallery.every(imageValid) ||
     (req.user!.role !== "barber" && gallery.length)
   ) {
-    res
-      .status(400)
-      .json({
-        error:
-          "En fazla 6 JPEG, PNG veya WebP görsel yükleyin (görsel başına yaklaşık 1 MB).",
-      });
+    res.status(400).json({
+      error:
+        "En fazla 6 JPEG, PNG veya WebP görsel yükleyin (görsel başına yaklaşık 1 MB).",
+    });
     return;
   }
   await settings(req.user!.id);
@@ -451,9 +449,6 @@ router.delete("/account", authenticate, async (req: AuthRequest, res) => {
     );
     await tx.execute(
       sql`UPDATE barber_customers SET private_notes='', tags='' WHERE customer_id IN (SELECT id FROM customers WHERE user_id=${user.id}) OR barber_id IN (SELECT id FROM barbers WHERE user_id=${user.id})`,
-    );
-    await tx.execute(
-      sql`DELETE FROM messages WHERE sender_id=${user.id} OR receiver_id=${user.id}`,
     );
     await tx.execute(sql`DELETE FROM password_resets WHERE user_id=${user.id}`);
     await tx.execute(

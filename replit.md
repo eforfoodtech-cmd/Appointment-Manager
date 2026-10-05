@@ -32,7 +32,7 @@ A full-stack Turkish barber appointment SaaS with two user roles: barber and cus
 
 ## Database Schema
 
-8 tables: `users`, `barbers`, `customers`, `availability`, `appointment_slots`, `appointments`, `no_show_blocks`, `messages`
+Core tables include `users`, `barbers`, `customers`, `availability`, `appointment_slots`, `appointments`, and `no_show_blocks`.
 
 **Enums**: `role` (barber | customer), `appointment_status` (pending | confirmed | cancelled | completed | no_show)
 
@@ -64,8 +64,6 @@ All routes prefixed with `/api`:
 | POST | /appointments | JWT | Book appointment |
 | GET | /appointments/:id | JWT | Get appointment |
 | PATCH | /appointments/:id | JWT | Update status/reschedule |
-| GET | /messages | JWT | List messages |
-| POST | /messages | JWT | Send message |
 | GET | /customers/me/upcoming | Customer | Upcoming appointments |
 
 ## Mobile Screens
@@ -75,13 +73,11 @@ All routes prefixed with `/api`:
 **Barber tabs**:
 - `(barber)/index` — Dashboard with today's stats + appointment list
 - `(barber)/slots` — Slot management (horizontal date scroll + grid buttons)
-- `(barber)/messages` — Inbox + compose
 - `(barber)/profile` — Edit shop info + manage no-show blocks
 
 **Customer tabs**:
 - `(customer)/index` — Upcoming appointments
 - `(customer)/barbers` — Browse barbers
-- `(customer)/messages` — Message inbox
 - `(customer)/profile` — Account info
 
 **Detail screens**:

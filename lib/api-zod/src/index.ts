@@ -31,8 +31,6 @@ export type {
   UpdateAppointmentRequest,
   NoShowBlock,
   CreateBlockRequest,
-  Message,
-  SendMessageRequest,
   BarberDashboard,
   ListAppointmentsParams,
   GetBarberDashboardParams,

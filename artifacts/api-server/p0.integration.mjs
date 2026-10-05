@@ -426,10 +426,6 @@ try {
         await db.query(`DELETE FROM ${table} WHERE user_id = ANY($1::int[])`, [
           users,
         ]);
-      await db.query(
-        "DELETE FROM messages WHERE sender_id=ANY($1::int[]) OR receiver_id=ANY($1::int[])",
-        [users],
-      );
       for (const table of [
         "appointments",
         "barber_customers",

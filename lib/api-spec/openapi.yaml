@@ -20,8 +20,6 @@ tags:
     description: Appointment management
   - name: customers
     description: Customer management
-  - name: messages
-    description: Messaging
   - name: notifications
     description: Push notifications
 
@@ -1909,45 +1907,6 @@ paths:
         "204":
           description: Block removed
 
-  # Messages
-  /messages:
-    get:
-      operationId: listMessages
-      tags: [messages]
-      summary: List messages for current user
-      security:
-        - bearerAuth: []
-      responses:
-        "200":
-          description: Message list
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/Message"
-    post:
-      operationId: sendMessage
-      tags: [messages]
-      summary: Send a message (barber to one or multiple customers)
-      security:
-        - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/SendMessageRequest"
-      responses:
-        "201":
-          description: Message sent
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/Message"
-
   # Push notifications
   /push-tokens:
     post:
@@ -2681,50 +2640,6 @@ components:
           description: Optional expiry. Omit for permanent block.
       required:
         - customerId
-
-    Message:
-      type: object
-      properties:
-        id:
-          type: integer
-        senderId:
-          type: integer
-        receiverId:
-          type: integer
-        content:
-          type: string
-        isRead:
-          type: boolean
-        createdAt:
-          type: string
-          format: date-time
-        senderName:
-          type: string
-        receiverName:
-          type: string
-      required:
-        - id
-        - senderId
-        - receiverId
-        - content
-        - isRead
-        - createdAt
-        - senderName
-        - receiverName
-
-    SendMessageRequest:
-      type: object
-      properties:
-        receiverIds:
-          type: array
-          items:
-            type: integer
-          description: One or multiple customer IDs
-        content:
-          type: string
-      required:
-        - receiverIds
-        - content
 
     PushToken:
       type: object

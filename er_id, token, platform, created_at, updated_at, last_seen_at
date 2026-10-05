@@ -1,6 +1,0 @@
- id | user_id | appointment_id |    type     |     scheduled_for      | status  |          title           |                      body                      |          created_at           
-----+---------+----------------+-------------+------------------------+---------+--------------------------+------------------------------------------------+-------------------------------
-  9 |       4 |            115 | reminder_1d | 2026-06-04 19:00:00+00 | pending | Yarın randevunuz var     | Onur Berber — yarın saat 22:00 randevunuz var. | 2026-06-04 18:35:31.378129+00
- 10 |       4 |            115 | reminder_1h | 2026-06-05 18:00:00+00 | pending | Randevunuza 1 saat kaldı | Onur Berber — bugün saat 22:00 randevunuz var. | 2026-06-04 18:35:31.378129+00
-(2 rows)
-

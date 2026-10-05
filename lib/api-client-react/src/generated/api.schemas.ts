@@ -408,23 +408,6 @@ export interface CreateBlockRequest {
   expiresAt?: string;
 }
 
-export interface Message {
-  id: number;
-  senderId: number;
-  receiverId: number;
-  content: string;
-  isRead: boolean;
-  createdAt: string;
-  senderName: string;
-  receiverName: string;
-}
-
-export interface SendMessageRequest {
-  /** One or multiple customer IDs */
-  receiverIds: number[];
-  content: string;
-}
-
 export interface PushToken {
   id: number;
   userId: number;

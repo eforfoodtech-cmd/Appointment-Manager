@@ -112,7 +112,6 @@ function ClassicTabLayout() {
           ),
         }}
       />
-      <Tabs.Screen name="messages" options={{ href: null }} />
       <Tabs.Screen
         name="profile"
         options={{

@@ -1,34 +1,8 @@
 const ACCESS_CODE_LENGTH = 6;
-const ACCESS_CODE_SPACE = 900_000;
-const ACCESS_CODE_MULTIPLIER = 7_919;
-const ACCESS_CODE_OFFSET = 104_729;
-
 const ACCESS_CODE_PATTERN = /^\d{6}$/;
 
 function isSixDigitCode(value: string): boolean {
   return ACCESS_CODE_PATTERN.test(value);
-}
-
-/**
- * Returns the stable six-digit demo access code for a barber profile.
- *
- * 7,919 and 900,000 are coprime, so this affine mapping is a permutation
- * (and therefore collision-free) for profile IDs in the 0..899,999 range.
- */
-export function getBarberAccessCode(barberId: number): string {
-  if (!Number.isSafeInteger(barberId) || barberId < 0) {
-    throw new Error("Berber kimliği negatif olmayan bir tam sayı olmalıdır.");
-  }
-
-  const idInDemoRange =
-    ((barberId % ACCESS_CODE_SPACE) + ACCESS_CODE_SPACE) % ACCESS_CODE_SPACE;
-  const numericCode =
-    (idInDemoRange * ACCESS_CODE_MULTIPLIER + ACCESS_CODE_OFFSET) %
-    ACCESS_CODE_SPACE;
-
-  // TODO(backend): Replace this deterministic demo mapping with a persisted,
-  // server-issued unique access code once the barber access API is available.
-  return String(numericCode).padStart(ACCESS_CODE_LENGTH, "0");
 }
 
 /**

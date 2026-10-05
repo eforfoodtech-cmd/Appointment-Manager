@@ -959,29 +959,6 @@ export const RemoveBlockParams = zod.object({
 });
 
 /**
- * @summary List messages for current user
- */
-export const ListMessagesResponseItem = zod.object({
-  id: zod.number(),
-  senderId: zod.number(),
-  receiverId: zod.number(),
-  content: zod.string(),
-  isRead: zod.boolean(),
-  createdAt: zod.coerce.date(),
-  senderName: zod.string(),
-  receiverName: zod.string(),
-});
-export const ListMessagesResponse = zod.array(ListMessagesResponseItem);
-
-/**
- * @summary Send a message (barber to one or multiple customers)
- */
-export const SendMessageBody = zod.object({
-  receiverIds: zod.array(zod.number()).describe("One or multiple customer IDs"),
-  content: zod.string(),
-});
-
-/**
  * @summary Register or update an Expo push token for the current user
  */
 

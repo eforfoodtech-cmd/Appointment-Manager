@@ -55,7 +55,6 @@ import type {
   ListServices200Item,
   LoginRequest,
   LogoutAllSessions200,
-  Message,
   NoShowBlock,
   PasswordResetConfirmRequest,
   PasswordResetMessageResponse,
@@ -73,7 +72,6 @@ import type {
   SaveAccountMedia200,
   SaveAccountMediaBody,
   SeedWeekSlots200,
-  SendMessageRequest,
   UpdateAccount200,
   UpdateAccountBody,
   UpdateAppointmentRequest,
@@ -4133,167 +4131,6 @@ export const useRemoveBlock = <
   TContext
 > => {
   return useMutation(getRemoveBlockMutationOptions(options));
-};
-
-/**
- * @summary List messages for current user
- */
-export const getListMessagesUrl = () => {
-  return `/api/messages`;
-};
-
-export const listMessages = async (
-  options?: RequestInit,
-): Promise<Message[]> => {
-  return customFetch<Message[]>(getListMessagesUrl(), {
-    ...options,
-    method: "GET",
-  });
-};
-
-export const getListMessagesQueryKey = () => {
-  return [`/api/messages`] as const;
-};
-
-export const getListMessagesQueryOptions = <
-  TData = Awaited<ReturnType<typeof listMessages>>,
-  TError = ErrorType<unknown>,
->(options?: {
-  query?: UseQueryOptions<
-    Awaited<ReturnType<typeof listMessages>>,
-    TError,
-    TData
-  >;
-  request?: SecondParameter<typeof customFetch>;
-}) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey = queryOptions?.queryKey ?? getListMessagesQueryKey();
-
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof listMessages>>> = ({
-    signal,
-  }) => listMessages({ signal, ...requestOptions });
-
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof listMessages>>,
-    TError,
-    TData
-  > & { queryKey: QueryKey };
-};
-
-export type ListMessagesQueryResult = NonNullable<
-  Awaited<ReturnType<typeof listMessages>>
->;
-export type ListMessagesQueryError = ErrorType<unknown>;
-
-/**
- * @summary List messages for current user
- */
-
-export function useListMessages<
-  TData = Awaited<ReturnType<typeof listMessages>>,
-  TError = ErrorType<unknown>,
->(options?: {
-  query?: UseQueryOptions<
-    Awaited<ReturnType<typeof listMessages>>,
-    TError,
-    TData
-  >;
-  request?: SecondParameter<typeof customFetch>;
-}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-  const queryOptions = getListMessagesQueryOptions(options);
-
-  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
-    queryKey: QueryKey;
-  };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
-
-/**
- * @summary Send a message (barber to one or multiple customers)
- */
-export const getSendMessageUrl = () => {
-  return `/api/messages`;
-};
-
-export const sendMessage = async (
-  sendMessageRequest: SendMessageRequest,
-  options?: RequestInit,
-): Promise<Message[]> => {
-  return customFetch<Message[]>(getSendMessageUrl(), {
-    ...options,
-    method: "POST",
-    headers: { "Content-Type": "application/json", ...options?.headers },
-    body: JSON.stringify(sendMessageRequest),
-  });
-};
-
-export const getSendMessageMutationOptions = <
-  TError = ErrorType<unknown>,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof sendMessage>>,
-    TError,
-    { data: BodyType<SendMessageRequest> },
-    TContext
-  >;
-  request?: SecondParameter<typeof customFetch>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof sendMessage>>,
-  TError,
-  { data: BodyType<SendMessageRequest> },
-  TContext
-> => {
-  const mutationKey = ["sendMessage"];
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      "mutationKey" in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
-
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof sendMessage>>,
-    { data: BodyType<SendMessageRequest> }
-  > = (props) => {
-    const { data } = props ?? {};
-
-    return sendMessage(data, requestOptions);
-  };
-
-  return { mutationFn, ...mutationOptions };
-};
-
-export type SendMessageMutationResult = NonNullable<
-  Awaited<ReturnType<typeof sendMessage>>
->;
-export type SendMessageMutationBody = BodyType<SendMessageRequest>;
-export type SendMessageMutationError = ErrorType<unknown>;
-
-/**
- * @summary Send a message (barber to one or multiple customers)
- */
-export const useSendMessage = <
-  TError = ErrorType<unknown>,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof sendMessage>>,
-    TError,
-    { data: BodyType<SendMessageRequest> },
-    TContext
-  >;
-  request?: SecondParameter<typeof customFetch>;
-}): UseMutationResult<
-  Awaited<ReturnType<typeof sendMessage>>,
-  TError,
-  { data: BodyType<SendMessageRequest> },
-  TContext
-> => {
-  return useMutation(getSendMessageMutationOptions(options));
 };
 
 /**
